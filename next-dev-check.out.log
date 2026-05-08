@@ -1,0 +1,17 @@
+
+> ivbcc@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.121:3000
+- Environments: .env.local
+✓ Ready in 2.1s
+
+○ Compiling /admin/noticias ...
+ GET /admin/noticias 200 in 9.7s (next.js: 8.2s, application-code: 1492ms)
+ HEAD /admin/login 200 in 3.3s (next.js: 2.5s, application-code: 872ms)
+ HEAD /admin/noticias 307 in 3.4s (next.js: 2.3s, application-code: 1082ms)
+ HEAD /admin/noticias/crear 307 in 3.4s (next.js: 2.3s, application-code: 1087ms)
+ GET /admin/noticias 200 in 435ms (next.js: 13ms, application-code: 422ms)
+[?25h

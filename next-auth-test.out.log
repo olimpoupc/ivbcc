@@ -1,0 +1,8 @@
+
+> ivbcc@0.1.0 start
+> next start -p 3008
+
+▲ Next.js 16.2.4
+- Local:         http://localhost:3008
+- Network:       http://192.168.1.121:3008
+✓ Ready in 347ms

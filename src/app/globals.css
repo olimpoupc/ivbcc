@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+:root {
+  --ivbcc-navy: #0b1f3a;
+  --ivbcc-gold: #d4af37;
+  --ivbcc-white: #ffffff;
+}
+
+body {
+  background: var(--ivbcc-white);
+  color: #171717;
+  font-family: Arial, Helvetica, sans-serif;
+}

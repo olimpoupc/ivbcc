@@ -1,0 +1,17 @@
+
+> ivbcc@0.1.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.121:3000
+- Environments: .env.local
+✓ Ready in 2.0s
+Creating turbopack project { dir: 'C:\\Users\\isaca\\Desktop\\ivbcc', testMode: true }
+
+○ Compiling /admin/noticias ...
+ GET /admin/noticias 200 in 6.8s (next.js: 5.2s, application-code: 1636ms)
+ HEAD /admin/noticias 307 in 255ms (next.js: 27ms, application-code: 228ms)
+ HEAD /admin/login 200 in 1713ms (next.js: 1576ms, application-code: 137ms)
+ HEAD /admin/noticias/crear 307 in 1486ms (next.js: 1150ms, application-code: 336ms)
+[?25h

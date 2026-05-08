@@ -1,0 +1,38 @@
+
+> ivbcc@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.121:3000
+- Environments: .env.local
+✓ Ready in 2.1s
+
+○ Compiling /admin/login ...
+ HEAD /admin/login 200 in 13.2s (next.js: 12.6s, application-code: 585ms)
+ HEAD /admin/noticias?q=&status=all 307 in 13.4s (next.js: 12.7s, application-code: 655ms)
+ GET /admin/noticias?q=&status=all 200 in 741ms (next.js: 35ms, application-code: 706ms)
+ GET /admin/noticias/07cde35d-5718-408e-9063-ec8d7a6d0e3f/editar 200 in 4.6s (next.js: 4.4s, application-code: 146ms)
+ GET /admin/noticias/07cde35d-5718-408e-9063-ec8d7a6d0e3f/editar 200 in 1033ms (next.js: 835ms, application-code: 198ms)
+ GET /admin/noticias/07cde35d-5718-408e-9063-ec8d7a6d0e3f/editar 200 in 86ms (next.js: 8ms, application-code: 78ms)
+ GET /admin/noticias 200 in 990ms (next.js: 33ms, application-code: 957ms)
+○ Compiling /noticias ...
+ GET /noticias 200 in 7.4s (next.js: 5.9s, application-code: 1584ms)
+ GET /admin/noticias 200 in 1294ms (next.js: 47ms, application-code: 1247ms)
+ GET /admin/noticias/crear 200 in 2.3s (next.js: 1964ms, application-code: 330ms)
+ GET /admin/noticias/crear 200 in 54ms (next.js: 7ms, application-code: 47ms)
+ GET /admin/noticias/crear 200 in 224ms (next.js: 12ms, application-code: 211ms)
+ GET /noticias 200 in 776ms (next.js: 24ms, application-code: 751ms)
+ GET /admin/noticias 200 in 975ms (next.js: 85ms, application-code: 889ms)
+ GET /admin/noticias 200 in 633ms (next.js: 8ms, application-code: 625ms)
+ GET /noticias 200 in 663ms (next.js: 5ms, application-code: 657ms)
+ GET /admin/noticias 200 in 559ms (next.js: 9ms, application-code: 550ms)
+ GET /admin/noticias 200 in 610ms (next.js: 12ms, application-code: 598ms)
+ GET /noticias 200 in 263ms (next.js: 6ms, application-code: 256ms)
+ GET /admin/noticias 200 in 476ms (next.js: 31ms, application-code: 445ms)
+ GET /noticias/oigwngnoqeinqgi 200 in 2.3s (next.js: 1288ms, application-code: 973ms)
+ GET /noticias/oigwngnoqeinqgi 200 in 7.5s (next.js: 5.1s, application-code: 2.4s)
+ GET /noticias/oigwngnoqeinqgi 200 in 887ms (next.js: 9ms, application-code: 878ms)
+ GET /noticias/oigwngnoqeinqgi 200 in 1038ms (next.js: 5ms, application-code: 1034ms)
+ GET /noticias/oigwngnoqeinqgi 200 in 1770ms (next.js: 6ms, application-code: 1764ms)
+ GET /noticias 200 in 483ms (next.js: 35ms, application-code: 448ms)

@@ -1,0 +1,10 @@
+
+> ivbcc@0.1.0 dev
+> next dev -p 3005
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3005
+- Network:       http://192.168.1.121:3005
+- Environments: .env.local
+✓ Ready in 983ms
+[?25h
