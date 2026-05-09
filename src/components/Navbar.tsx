@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -16,6 +16,8 @@ const primaryLinks = [
   { href: "/publicaciones", label: "Publicaciones" },
   { href: "/contacto", label: "Contacto" },
 ];
+
+type ActiveDropdown = "more" | "account" | null;
 
 function buildTelHref(phone: string) {
   const trimmedPhone = phone.trim();
@@ -49,6 +51,9 @@ export default function Navbar({
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<ActiveDropdown>(null);
+  const accountDropdownRef = useRef<HTMLDivElement | null>(null);
+  const moreDropdownRef = useRef<HTMLLIElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -76,10 +81,57 @@ export default function Navbar({
     };
   }, []);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setActiveDropdown(null), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Node)) return;
+
+      const clickedInsideAccount =
+        accountDropdownRef.current?.contains(target) || false;
+      const clickedInsideMore =
+        moreDropdownRef.current?.contains(target) || false;
+
+      if (!clickedInsideAccount && !clickedInsideMore) {
+        setActiveDropdown(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveDropdown(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   async function handleLogout() {
+    setActiveDropdown(null);
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
+  }
+
+  function toggleDropdown(dropdown: Exclude<ActiveDropdown, null>) {
+    setActiveDropdown((currentDropdown) =>
+      currentDropdown === dropdown ? null : dropdown
+    );
+  }
+
+  function closeDropdowns() {
+    setActiveDropdown(null);
   }
 
   const logoSrc = siteSettings.logo_url || "/images/logonegro.png";
@@ -175,14 +227,25 @@ export default function Navbar({
             <span className="hidden h-4 w-px bg-white/22 sm:block" />
 
             {isLoggedIn ? (
-              <details className="group relative">
-                <summary className="cursor-pointer list-none rounded-full px-3 py-1.5 font-semibold text-white/86 transition hover:bg-white/10 hover:text-white [&::-webkit-details-marker]:hidden">
+              <div ref={accountDropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown("account")}
+                  aria-expanded={activeDropdown === "account"}
+                  aria-controls="navbar-account-menu"
+                  className="cursor-pointer rounded-full px-3 py-1.5 font-semibold text-white/86 transition hover:bg-white/10 hover:text-white"
+                >
                   Mi cuenta
-                </summary>
-                <ul className="absolute right-0 z-30 mt-2 min-w-44 rounded-2xl border border-[#e8e2d6] bg-white p-2 text-sm text-[var(--ivbcc-ink)] shadow-xl">
+                </button>
+                {activeDropdown === "account" ? (
+                <ul
+                  id="navbar-account-menu"
+                  className="absolute right-0 z-[70] mt-2 min-w-44 rounded-2xl border border-[#e8e2d6] bg-white p-2 text-sm text-[var(--ivbcc-ink)] shadow-xl"
+                >
                   <li>
                     <Link
                       href="/perfil"
+                      onClick={closeDropdowns}
                       className="block rounded-xl px-3 py-2 transition hover:bg-[#f3eee4]"
                     >
                       Perfil
@@ -191,6 +254,7 @@ export default function Navbar({
                   <li>
                     <Link
                       href="/mis-cursos"
+                      onClick={closeDropdowns}
                       className="block rounded-xl px-3 py-2 transition hover:bg-[#f3eee4]"
                     >
                       Mis cursos
@@ -206,10 +270,12 @@ export default function Navbar({
                     </button>
                   </li>
                 </ul>
-              </details>
+                ) : null}
+              </div>
             ) : (
               <Link
                 href="/login"
+                onClick={closeDropdowns}
                 className="rounded-full px-3 py-1.5 font-semibold text-white/86 transition hover:bg-white/10 hover:text-white"
               >
                 Iniciar sesión
@@ -257,6 +323,7 @@ export default function Navbar({
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    onClick={closeDropdowns}
                     className={`inline-flex rounded-full px-3 py-2 font-semibold transition ${
                       isActive
                         ? "bg-[var(--ivbcc-navy)] text-white"
@@ -268,15 +335,25 @@ export default function Navbar({
                 </li>
               );
             })}
-            <li className="relative">
-              <details className="group">
-                <summary className="cursor-pointer list-none rounded-full px-3 py-2 font-semibold text-slate-700 transition hover:bg-[#f3eee4] hover:text-[var(--ivbcc-navy)] [&::-webkit-details-marker]:hidden">
+            <li ref={moreDropdownRef} className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown("more")}
+                aria-expanded={activeDropdown === "more"}
+                aria-controls="navbar-more-menu"
+                className="cursor-pointer rounded-full px-3 py-2 font-semibold text-slate-700 transition hover:bg-[#f3eee4] hover:text-[var(--ivbcc-navy)]"
+              >
                   Más
-                </summary>
-                <ul className="absolute left-0 z-20 mt-3 min-w-40 rounded-2xl border border-[#e8e2d6] bg-white p-2 text-sm text-[var(--ivbcc-ink)] shadow-xl">
+              </button>
+              {activeDropdown === "more" ? (
+                <ul
+                  id="navbar-more-menu"
+                  className="absolute left-0 z-[70] mt-3 min-w-40 rounded-2xl border border-[#e8e2d6] bg-white p-2 text-sm text-[var(--ivbcc-ink)] shadow-xl"
+                >
                   <li>
                     <Link
                       href="/nosotros"
+                      onClick={closeDropdowns}
                       className="block rounded-xl px-3 py-2 transition hover:bg-[#f3eee4]"
                     >
                       Nosotros
@@ -285,22 +362,24 @@ export default function Navbar({
                   <li>
                     <Link
                       href="/iglesias"
+                      onClick={closeDropdowns}
                       className="block rounded-xl px-3 py-2 transition hover:bg-[#f3eee4]"
                     >
                       Iglesias
                     </Link>
                   </li>
                 </ul>
-              </details>
+              ) : null}
             </li>
           </ul>
 
           <div className="flex items-center gap-3">
             <Link
               href="/en-vivo"
-              onClick={() =>
-                trackEvent("open_live_stream", { location: "navbar" })
-              }
+              onClick={() => {
+                closeDropdowns();
+                trackEvent("open_live_stream", { location: "navbar" });
+              }}
               className="btn-primary"
             >
               Transmisiones
