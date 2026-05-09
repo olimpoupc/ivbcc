@@ -175,16 +175,19 @@ export default async function PublicacionDetallePage({ params }: Props) {
   const videoEmbedUrl = getYouTubeEmbedUrl(publication.video_url);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main className="premium-page">
+      <div className="site-shell pt-8">
       <Link
         href="/publicaciones"
-        className="mb-8 inline-flex rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-[var(--ivbcc-navy)] hover:text-white"
+        className="btn-ghost mb-8"
       >
         Volver a publicaciones
       </Link>
+      </div>
 
       {publication.image_url ? (
-        <div className="mb-10 overflow-hidden rounded-[28px] bg-slate-100 p-5 shadow-sm">
+        <div className="site-shell mb-10">
+        <div className="media-frame overflow-hidden rounded-[30px] bg-[#ebe6dc] p-5 shadow-lg">
           <div className="relative h-[300px] w-full md:h-[420px]">
             <Image
               src={publication.image_url}
@@ -196,33 +199,34 @@ export default async function PublicacionDetallePage({ params }: Props) {
             />
           </div>
         </div>
+        </div>
       ) : null}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="site-shell grid gap-8 pb-16 lg:grid-cols-[minmax(0,1fr)_280px]">
         <section className="space-y-8">
-          <header className="rounded-[28px] bg-white p-8 shadow-sm">
+          <header className="premium-surface rounded-[30px] p-8 md:p-10">
             <div className="flex flex-wrap gap-2">
-              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              <span className="badge">
                 {category}
               </span>
               {publication.featured && (
-                <span className="inline-flex rounded-full bg-[var(--ivbcc-gold)]/15 px-3 py-1 text-xs font-semibold text-[var(--ivbcc-navy)] ring-1 ring-[var(--ivbcc-gold)]/30">
+                <span className="badge">
                   Destacado
                 </span>
               )}
               {publication.category === "video" && publication.video_url && (
-                <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                <span className="badge border-red-200 bg-red-50 text-red-700">
                   Video
                 </span>
               )}
               {publication.file_url && (
-                <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                <span className="badge border-amber-200 bg-amber-50 text-amber-700">
                   Descargable
                 </span>
               )}
             </div>
 
-            <h1 className="mt-5 text-3xl font-bold leading-tight text-gray-950 md:text-4xl">
+            <h1 className="section-title mt-5 text-4xl text-gray-950 md:text-5xl">
               {publication.title}
             </h1>
 
@@ -234,8 +238,8 @@ export default async function PublicacionDetallePage({ params }: Props) {
           </header>
 
           {publication.summary && (
-            <section className="rounded-[28px] bg-white p-8 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+            <section className="premium-surface rounded-[30px] p-8">
+              <p className="kicker">
                 Resumen
               </p>
               <p className="mt-4 text-lg leading-relaxed text-gray-700">
@@ -245,24 +249,24 @@ export default async function PublicacionDetallePage({ params }: Props) {
           )}
 
           {publication.content && (
-            <article className="rounded-[28px] bg-white p-8 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+            <article className="premium-surface rounded-[30px] p-8">
+              <p className="kicker">
                 Contenido
               </p>
-              <div className="mt-5 whitespace-pre-line text-lg leading-relaxed text-gray-800">
+              <div className="prose-premium mt-5 whitespace-pre-line">
                 {publication.content}
               </div>
             </article>
           )}
 
           {(videoEmbedUrl || publication.file_url) && (
-            <section className="rounded-[28px] bg-white p-8 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+            <section className="premium-surface rounded-[30px] p-8">
+              <p className="kicker">
                 Recursos
               </p>
 
               {videoEmbedUrl && (
-                <div className="mt-5 overflow-hidden rounded-[24px] bg-slate-950 shadow-md">
+                <div className="mt-5 overflow-hidden rounded-[24px] bg-slate-950 shadow-lg">
                   <div className="relative aspect-video w-full">
                     <iframe
                       src={videoEmbedUrl}
@@ -277,7 +281,7 @@ export default async function PublicacionDetallePage({ params }: Props) {
               )}
 
               {publication.file_url && (
-                <div className="mt-6 rounded-3xl border border-amber-100 bg-amber-50/80 p-6">
+                <div className="mt-6 rounded-[24px] border border-amber-100 bg-amber-50/80 p-6">
                   <p className="text-base font-semibold text-gray-900">
                     Recurso disponible para descarga
                   </p>
@@ -294,7 +298,7 @@ export default async function PublicacionDetallePage({ params }: Props) {
                       type: "publication",
                       slug: publication.slug,
                     }}
-                    className="mt-5 inline-flex rounded-xl bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                    className="btn-primary mt-5"
                   >
                     Descargar recurso
                   </TrackedLink>
@@ -303,15 +307,15 @@ export default async function PublicacionDetallePage({ params }: Props) {
             </section>
           )}
 
-          <nav className="rounded-[28px] bg-white p-8 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <nav className="premium-surface rounded-[30px] p-8">
+            <p className="kicker">
               Navegación
             </p>
             <div className="mt-5 flex flex-col gap-3 md:flex-row md:flex-wrap">
               {previousPublication ? (
                 <Link
                   href={`/publicaciones/${previousPublication.slug}`}
-                  className="inline-flex rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[var(--ivbcc-gold)] hover:text-[var(--ivbcc-navy)]"
+                  className="btn-ghost"
                 >
                   Publicación anterior
                 </Link>
@@ -320,7 +324,7 @@ export default async function PublicacionDetallePage({ params }: Props) {
               {nextPublication ? (
                 <Link
                   href={`/publicaciones/${nextPublication.slug}`}
-                  className="inline-flex rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[var(--ivbcc-gold)] hover:text-[var(--ivbcc-navy)]"
+                  className="btn-ghost"
                 >
                   Siguiente publicación
                 </Link>
@@ -329,13 +333,13 @@ export default async function PublicacionDetallePage({ params }: Props) {
           </nav>
 
           {morePublications.length > 0 && (
-            <section className="rounded-[28px] bg-white p-8 shadow-sm">
+            <section className="premium-surface rounded-[30px] p-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+                  <p className="kicker">
                     Más publicaciones
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-gray-950">
+                  <h2 className="section-title mt-2 text-3xl text-gray-950">
                     Sigue explorando
                   </h2>
                 </div>
@@ -345,14 +349,14 @@ export default async function PublicacionDetallePage({ params }: Props) {
                 {morePublications.map((item) => (
                   <article
                     key={item.id}
-                    className="rounded-3xl border border-slate-100 bg-slate-50 p-5"
+                    className="rounded-[24px] border border-[#e8e2d6] bg-[#fbfaf7] p-5"
                   >
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="badge bg-white">
                         {categoryConfig[item.category] || "Publicación"}
                       </span>
                       {item.featured ? (
-                        <span className="inline-flex rounded-full bg-[var(--ivbcc-gold)]/15 px-3 py-1 text-xs font-semibold text-[var(--ivbcc-navy)]">
+                        <span className="badge">
                           Destacado
                         </span>
                       ) : null}
@@ -372,7 +376,7 @@ export default async function PublicacionDetallePage({ params }: Props) {
 
                     <Link
                       href={`/publicaciones/${item.slug}`}
-                      className="mt-4 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                      className="mt-4 inline-flex text-sm font-extrabold text-[var(--ivbcc-navy)]"
                     >
                       Ver publicación
                     </Link>

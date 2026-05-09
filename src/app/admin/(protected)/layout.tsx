@@ -9,6 +9,7 @@ const adminNavItems = [
   { href: "/admin/noticias", label: "Noticias" },
   { href: "/admin/eventos", label: "Eventos" },
   { href: "/admin/formacion", label: "Formación" },
+  { href: "/admin/certificados", label: "Certificados" },
   { href: "/admin/inscripciones", label: "Inscripciones" },
   { href: "/admin/publicaciones", label: "Publicaciones" },
   { href: "/admin/en-vivo", label: "En Vivo" },

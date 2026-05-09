@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isClientRateLimited } from "@/lib/security";
+import FormField from "@/components/ui/FormField";
 
 export default function AdminLoginForm() {
   const [email, setEmail] = useState("");
@@ -31,35 +32,27 @@ export default function AdminLoginForm() {
 
   return (
     <form onSubmit={handleLogin} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Correo electrónico
-        </label>
-        <input
-          type="email"
-          placeholder="admin@ivbcc.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
-          required
-        />
-      </div>
+      <FormField
+        label="Correo electrónico"
+        type="email"
+        placeholder="admin@ivbcc.com"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        required
+      />
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Contraseña</label>
-        <input
-          type="password"
-          placeholder="********"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
-          required
-        />
-      </div>
+      <FormField
+        label="Contraseña"
+        type="password"
+        placeholder="********"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        required
+      />
 
       <button
         type="submit"
-        className="w-full bg-[var(--ivbcc-navy)] text-white py-2 rounded-lg font-semibold hover:opacity-90 transition"
+        className="btn-primary w-full"
       >
         Ingresar
       </button>

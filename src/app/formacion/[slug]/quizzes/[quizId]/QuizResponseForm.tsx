@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type QuizOption = {
@@ -23,6 +24,7 @@ type Props = {
 };
 
 export default function QuizResponseForm({ quizId, questions }: Props) {
+  const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,39 +83,6 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
       return;
     }
 
-    const { data: existingAttempts, error: existingAttemptError } = await supabase
-      .from("quiz_attempts")
-      .select("score,total_questions,created_at")
-      .eq("quiz_id", quizId)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (existingAttemptError) {
-      console.error(existingAttemptError);
-      setStepError("No pudimos validar tu intento anterior.");
-      return;
-    }
-
-    const existingAttempt = existingAttempts?.[0] ?? null;
-
-    if (existingAttempt) {
-      const savedPercentage = existingAttempt.total_questions
-        ? Math.round(
-            (existingAttempt.score / existingAttempt.total_questions) * 100
-          )
-        : 0;
-
-      setInfoMessage("Ya respondiste este quiz.");
-      setResult({
-        score: existingAttempt.score,
-        total: existingAttempt.total_questions,
-        percentage: savedPercentage,
-        passed: savedPercentage >= 60,
-      });
-      return;
-    }
-
     let score = 0;
 
     for (const question of questions) {
@@ -155,34 +124,46 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
       percentage,
       passed: percentage >= 60,
     });
+    router.refresh();
   }
 
   return (
     <div className="space-y-6">
       {infoMessage && (
-        <div className="rounded-2xl bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-700">
+        <div className="form-note border-blue-200 bg-blue-50/80 text-blue-800">
           {infoMessage}
         </div>
       )}
 
       {result && (
-        <div className="rounded-2xl bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
-          Obtuviste {result.score} de {result.total} respuestas correctas.
-          <div className="mt-2">Porcentaje: {result.percentage}%</div>
-          <div className="mt-2">
-            {result.passed ? "Aprobaste ✅" : "No aprobaste ❌"}
+        <div className="premium-surface rounded-[28px] p-6">
+          <p className="kicker">Resultado</p>
+          <h2 className="section-title mt-3 text-3xl text-gray-950">
+            {result.passed ? "Aprobaste" : "Sigue intentándolo"}
+          </h2>
+          <p className="muted-copy mt-3 text-sm">
+            Obtuviste {result.score} de {result.total} respuestas correctas.
+          </p>
+          <div className="mt-5 h-3 overflow-hidden rounded-full bg-[#f3eee4]">
+            <div
+              className="h-full rounded-full bg-[var(--ivbcc-gold)]"
+              style={{ width: `${result.percentage}%` }}
+            />
           </div>
+          <p className="mt-3 text-sm font-extrabold text-[var(--ivbcc-navy)]">
+            Porcentaje: {result.percentage}%
+          </p>
         </div>
       )}
 
       {!result && currentQuestion && (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <article className="rounded-2xl bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold text-gray-500">
+          <article className="premium-surface rounded-[28px] p-6">
+            <p className="kicker">
               Pregunta {currentQuestionIndex + 1} de {questions.length}
             </p>
 
-            <h2 className="mt-2 text-lg font-bold text-gray-950">
+            <h2 className="section-title mt-3 text-2xl text-gray-950">
               {currentQuestion.question_text}
             </h2>
 
@@ -190,10 +171,10 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
               {currentQuestion.options.map((option) => (
                 <label
                   key={option.id}
-                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-bold transition ${
                     selectedAnswer === option.id
-                      ? "border-[var(--ivbcc-gold)] bg-yellow-50 text-gray-900"
-                      : "text-gray-700"
+                      ? "border-[var(--ivbcc-gold)] bg-[#f6f1e8] text-gray-950"
+                      : "border-[#e8e2d6] bg-white/72 text-slate-700 hover:border-[var(--ivbcc-gold)]/50"
                   }`}
                 >
                   <input
@@ -208,7 +189,7 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
             </div>
 
             {stepError && (
-              <p className="mt-4 text-sm font-medium text-red-600">
+              <p className="form-note mt-4 border-red-200 bg-red-50/80 text-red-800">
                 {stepError}
               </p>
             )}
@@ -219,7 +200,7 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
               <button
                 type="button"
                 onClick={handleNext}
-                className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                className="btn-primary"
               >
                 Siguiente
               </button>
@@ -227,7 +208,7 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+                className="btn-primary disabled:opacity-60"
               >
                 {isSubmitting ? "Enviando..." : "Enviar respuestas"}
               </button>

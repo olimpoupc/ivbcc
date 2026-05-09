@@ -17,18 +17,17 @@ export default function EmptyImagePlaceholder({
 
   return (
     <div
-      className={`relative overflow-hidden bg-[linear-gradient(135deg,var(--ivbcc-navy)_0%,#173761_58%,#b88d2c_130%)] text-white ${className}`}
+      className={`relative overflow-hidden bg-[linear-gradient(135deg,var(--ivbcc-navy)_0%,#12315a_62%,#c9a24a_145%)] text-white ${className}`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(255,215,128,0.22),transparent_30%)]" />
-      <div className="absolute -right-10 top-0 h-32 w-32 rounded-full bg-white/10 blur-3xl" />
-      <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-[var(--ivbcc-gold)]/20 blur-3xl" />
+      <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.12),transparent_34%),linear-gradient(0deg,rgba(0,0,0,0.18),transparent_58%)]" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--ivbcc-gold)]/50" />
 
       <div
         className={`relative flex h-full flex-col justify-between ${
           isDetail ? "min-h-80 p-8 md:p-10" : "min-h-full p-5"
         }`}
       >
-        <div className="w-fit rounded-2xl bg-white/95 px-3 py-2 shadow-sm">
+        <div className="w-fit rounded-xl bg-white/95 px-3 py-2 shadow-sm">
           <Image
             src="/images/logonegro.png"
             alt="Logo IVBCC"
@@ -39,11 +38,11 @@ export default function EmptyImagePlaceholder({
         </div>
 
         <div className={isDetail ? "max-w-2xl" : "max-w-xs"}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[var(--ivbcc-gold-2)]">
             IVBCC
           </p>
           <h3
-            className={`mt-3 font-bold leading-tight ${
+            className={`font-display mt-3 font-extrabold leading-tight ${
               isDetail ? "text-3xl md:text-4xl" : "text-xl"
             }`}
           >

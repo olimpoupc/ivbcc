@@ -162,18 +162,20 @@ export default async function EnVivoDetallePage({ params }: Props) {
   const videoEmbedUrl = getYouTubeEmbedUrl(stream.youtube_url);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main className="premium-page">
+      <div className="site-shell pt-8">
       <Link
         href="/en-vivo"
-        className="mb-8 inline-flex rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-[var(--ivbcc-navy)] hover:text-white"
+        className="btn-ghost mb-8"
       >
         Volver a En Vivo
       </Link>
+      </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="site-shell grid gap-8 pb-16 lg:grid-cols-[minmax(0,1fr)_280px]">
         <section className="space-y-8">
           {videoEmbedUrl ? (
-            <section className="overflow-hidden rounded-[28px] bg-slate-950 shadow-md">
+            <section className="overflow-hidden rounded-[30px] bg-slate-950 shadow-lg">
               <div className="relative aspect-video w-full">
                 <iframe
                   src={videoEmbedUrl}
@@ -194,7 +196,7 @@ export default async function EnVivoDetallePage({ params }: Props) {
                   rel="noreferrer"
                   eventName="click_youtube"
                   eventParams={{ location: "live_stream_detail", slug: stream.slug }}
-                  className="inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[var(--ivbcc-navy)] transition hover:bg-white/90"
+                  className="btn-primary"
                 >
                   Ver en YouTube
                 </TrackedLink>
@@ -202,24 +204,24 @@ export default async function EnVivoDetallePage({ params }: Props) {
             </section>
           ) : null}
 
-          <header className="rounded-[28px] bg-white p-8 shadow-sm">
+          <header className="premium-surface rounded-[30px] p-8 md:p-10">
             <div className="flex flex-wrap gap-2">
-              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              <span className="badge">
                 {category}
               </span>
               {stream.featured && (
-                <span className="inline-flex rounded-full bg-[var(--ivbcc-gold)]/15 px-3 py-1 text-xs font-semibold text-[var(--ivbcc-navy)] ring-1 ring-[var(--ivbcc-gold)]/30">
+                <span className="badge">
                   Destacado
                 </span>
               )}
               {stream.is_live && (
-                <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                <span className="badge border-red-200 bg-red-50 text-red-700">
                   En vivo actual
                 </span>
               )}
             </div>
 
-            <h1 className="mt-5 text-3xl font-bold leading-tight text-gray-950 md:text-4xl">
+            <h1 className="section-title mt-5 text-4xl text-gray-950 md:text-5xl">
               {stream.title}
             </h1>
 
@@ -228,24 +230,24 @@ export default async function EnVivoDetallePage({ params }: Props) {
             </p>
           </header>
 
-          <section className="rounded-[28px] bg-white p-8 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <section className="premium-surface rounded-[30px] p-8">
+            <p className="kicker">
               Descripción
             </p>
-            <p className="mt-5 whitespace-pre-line text-lg leading-relaxed text-gray-700">
+            <p className="prose-premium mt-5 whitespace-pre-line">
               {stream.description || "Sin descripción disponible."}
             </p>
           </section>
 
-          <nav className="rounded-[28px] bg-white p-8 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <nav className="premium-surface rounded-[30px] p-8">
+            <p className="kicker">
               Navegación
             </p>
             <div className="mt-5 flex flex-col gap-3 md:flex-row md:flex-wrap">
               {previousStream ? (
                 <Link
                   href={`/en-vivo/${previousStream.slug}`}
-                  className="inline-flex rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[var(--ivbcc-gold)] hover:text-[var(--ivbcc-navy)]"
+                  className="btn-ghost"
                 >
                   Video anterior
                 </Link>
@@ -254,7 +256,7 @@ export default async function EnVivoDetallePage({ params }: Props) {
               {nextStream ? (
                 <Link
                   href={`/en-vivo/${nextStream.slug}`}
-                  className="inline-flex rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-[var(--ivbcc-gold)] hover:text-[var(--ivbcc-navy)]"
+                  className="btn-ghost"
                 >
                   Siguiente video
                 </Link>
@@ -263,13 +265,13 @@ export default async function EnVivoDetallePage({ params }: Props) {
           </nav>
 
           {relatedStreams.length > 0 ? (
-            <section className="rounded-[28px] bg-white p-8 shadow-sm">
+            <section className="premium-surface rounded-[30px] p-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+                  <p className="kicker">
                     Más transmisiones
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-gray-950">
+                  <h2 className="section-title mt-2 text-3xl text-gray-950">
                     Sigue viendo
                   </h2>
                 </div>
@@ -279,14 +281,14 @@ export default async function EnVivoDetallePage({ params }: Props) {
                 {relatedStreams.map((item) => (
                   <article
                     key={item.id}
-                    className="rounded-3xl border border-slate-100 bg-slate-50 p-5"
+                    className="rounded-[24px] border border-[#e8e2d6] bg-[#fbfaf7] p-5"
                   >
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="badge bg-white">
                         {categoryConfig[item.category] || "Transmisión"}
                       </span>
                       {item.featured ? (
-                        <span className="inline-flex rounded-full bg-[var(--ivbcc-gold)]/15 px-3 py-1 text-xs font-semibold text-[var(--ivbcc-navy)]">
+                        <span className="badge">
                           Destacado
                         </span>
                       ) : null}
@@ -308,7 +310,7 @@ export default async function EnVivoDetallePage({ params }: Props) {
                       href={`/en-vivo/${item.slug}`}
                       eventName="open_live_stream"
                       eventParams={{ slug: item.slug, location: "live_stream_related" }}
-                      className="mt-4 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                      className="mt-4 inline-flex text-sm font-extrabold text-[var(--ivbcc-navy)]"
                     >
                       Ver video
                     </TrackedNextLink>

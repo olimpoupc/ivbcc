@@ -3,6 +3,15 @@ import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildContentMetadata, resolveSeoDescription, seoConfig } from "@/lib/seo";
+import {
+  toCertificateViewModel,
+  type CourseCertificateRecord,
+} from "@/lib/certificates";
+import {
+  QUIZ_PASSING_PERCENTAGE,
+  buildCourseProgressState,
+  getQuizPercentage,
+} from "@/lib/course-progress";
 import CourseEnrollButton from "./CourseEnrollButton";
 import CourseCertificateButton from "./CourseCertificateButton";
 
@@ -104,15 +113,6 @@ export default async function CursoDetallePage({ params }: Props) {
 
   const isEnrolled = Boolean(enrollment);
 
-  const { data: progress } = user && isEnrolled
-    ? await supabase
-        .from("course_progress")
-        .select("lesson_id")
-        .eq("user_id", user.id)
-        .eq("course_id", course.id)
-        .eq("completed", true)
-    : { data: [] };
-
   const publishedQuizIds = (allPublishedQuizzes || []).map((quiz) => quiz.id);
   const { data: quizAttempts, error: quizAttemptsError } =
     user && isEnrolled && publishedQuizIds.length
@@ -128,83 +128,29 @@ export default async function CursoDetallePage({ params }: Props) {
     return <main className="p-10">Error cargando intentos de quizzes.</main>;
   }
 
-  const totalLessons = lessons?.length || 0;
-  const latestAttemptByQuiz = new Map<string, { score: number; total_questions: number }>();
+  const progressState = buildCourseProgressState({
+    lessons: (lessons || []).map((lesson) => ({
+      id: lesson.id,
+      order: lesson.order,
+    })),
+    quizzes: (allPublishedQuizzes || []).map((quiz) => ({
+      id: quiz.id,
+      lesson_id: quiz.lesson_id,
+    })),
+    attempts: quizAttempts || [],
+    isEnrolled,
+  });
 
-  for (const attempt of quizAttempts || []) {
-    if (!latestAttemptByQuiz.has(attempt.quiz_id)) {
-      latestAttemptByQuiz.set(attempt.quiz_id, {
-        score: attempt.score,
-        total_questions: attempt.total_questions,
-      });
-    }
-  }
-
-  const approvedQuizIds = new Set(
-    Array.from(latestAttemptByQuiz.entries())
-      .filter(([, attempt]) => {
-        const percentage = attempt.total_questions
-          ? Math.round((attempt.score / attempt.total_questions) * 100)
-          : 0;
-        return percentage >= 60;
-      })
-      .map(([quizId]) => quizId)
-  );
-  const lessonStatusById = new Map<
-    string,
-    "completed" | "pending" | "blocked"
-  >();
-
-  const publishedLessonQuizIdsByLesson = new Map<string, string[]>();
-
-  for (const quiz of allPublishedQuizzes || []) {
-    if (!quiz.lesson_id) continue;
-
-    const current = publishedLessonQuizIdsByLesson.get(quiz.lesson_id) || [];
-    current.push(quiz.id);
-    publishedLessonQuizIdsByLesson.set(quiz.lesson_id, current);
-  }
-
-  const effectiveCompletedLessonIds = new Set(
-    (progress || [])
-      .map((item) => item.lesson_id)
-      .filter((lessonId) => {
-        const lessonQuizIds = publishedLessonQuizIdsByLesson.get(lessonId) || [];
-
-        if (!lessonQuizIds.length) {
-          return true;
-        }
-
-        return lessonQuizIds.every((quizId) => approvedQuizIds.has(quizId));
-      })
-  );
-
-  for (const lesson of lessons || []) {
-    if (!isEnrolled) {
-      lessonStatusById.set(lesson.id, "blocked");
-      continue;
-    }
-
-    if (effectiveCompletedLessonIds.has(lesson.id)) {
-      lessonStatusById.set(lesson.id, "completed");
-      continue;
-    }
-
-    lessonStatusById.set(lesson.id, "pending");
-  }
-
-  const completedLessons = effectiveCompletedLessonIds.size;
-  const progressPercentage =
-    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-  const allLessonsCompleted = totalLessons > 0 && completedLessons === totalLessons;
-  const allQuizzesApproved =
-    publishedQuizIds.length === 0 || publishedQuizIds.every((quizId) => approvedQuizIds.has(quizId));
-  const isCourseCompleted = isEnrolled && allLessonsCompleted && allQuizzesApproved;
-  const certificateStudentName =
-    `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Estudiante IVBCC";
-
+  const { data: existingCertificate } = user && isEnrolled
+    ? await supabase
+        .from("course_certificates")
+        .select("id,code,user_id,course_id,student_name,course_title,issued_at,status")
+        .eq("user_id", user.id)
+        .eq("course_id", course.id)
+        .maybeSingle()
+    : { data: null };
   function getQuizStatus(quizId: string) {
-    const latestAttempt = latestAttemptByQuiz.get(quizId);
+    const latestAttempt = progressState.latestAttemptByQuiz.get(quizId);
 
     if (!latestAttempt) {
       return {
@@ -214,10 +160,10 @@ export default async function CursoDetallePage({ params }: Props) {
     }
 
     const percentage = latestAttempt.total_questions
-      ? Math.round((latestAttempt.score / latestAttempt.total_questions) * 100)
+      ? getQuizPercentage(latestAttempt)
       : 0;
 
-    if (percentage >= 60) {
+    if (percentage >= QUIZ_PASSING_PERCENTAGE) {
       return {
         label: "Aprobado",
         className: "bg-green-50 text-green-700 border-green-200",
@@ -231,32 +177,33 @@ export default async function CursoDetallePage({ params }: Props) {
   }
 
   function getLessonStatus(lessonId: string) {
-    const status = lessonStatusById.get(lessonId) || "pending";
+    const lessonState = progressState.lessonStateById.get(lessonId);
 
-    if (status === "completed") {
+    if (lessonState?.isCompleted) {
       return {
-        label: "Completada",
+        label: "✅ Completada",
         className: "bg-green-50 text-green-700 border-green-200",
       };
     }
 
-    if (status === "blocked") {
+    if (!lessonState?.isUnlocked) {
       return {
-        label: "Bloqueada",
-        className: "bg-gray-100 text-gray-500 border-gray-200",
+        label: "🔒 Bloqueada",
+        className: "bg-[#f3eee4] text-slate-500 border-[#e8e2d6]",
       };
     }
 
     return {
-      label: "Pendiente",
+      label: "▶ Disponible",
       className: "bg-yellow-50 text-yellow-800 border-yellow-200",
     };
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="premium-page">
+      <div className="site-shell py-10">
       {course.image_url ? (
-        <div className="relative mb-10 h-72 w-full overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
+        <div className="media-frame mb-10 h-80 rounded-[30px] shadow-lg">
           <Image
             src={course.image_url}
             alt={course.title}
@@ -271,37 +218,33 @@ export default async function CursoDetallePage({ params }: Props) {
           label="IVBCC Formación"
           subtitle="Un espacio para aprender, avanzar y fortalecer la fe."
           variant="detail"
-          className="mb-10 h-72 rounded-2xl shadow-sm"
+          className="mb-10 h-80 rounded-[30px] shadow-lg"
         />
       )}
 
       <section className="mx-auto max-w-3xl">
         <header
-          className={`mb-8 pb-8 ${
-            course.image_url ? "border-b border-gray-200" : ""
-          }`}
+          className="premium-surface mb-8 rounded-[30px] p-8 md:p-10"
         >
           <h1
-            className={`mb-5 text-3xl font-bold leading-tight md:text-4xl ${
-              course.image_url ? "text-gray-950" : "text-gray-950"
-            }`}
+            className="section-title mb-5 text-4xl text-gray-950 md:text-5xl"
           >
             {course.title}
           </h1>
 
-          <p className="text-lg leading-relaxed text-gray-600">
+          <p className="muted-copy text-lg">
             {course.description}
           </p>
 
           <div className="mt-6 space-y-4">
             {!user ? (
-              <div className="rounded-2xl bg-gray-50 px-5 py-4">
+              <div className="rounded-2xl bg-[#f6f1e8] px-5 py-4">
                 <p className="text-sm font-medium text-gray-600">
                   Inicia sesión para inscribirte
                 </p>
                 <Link
                   href="/login"
-                  className="mt-3 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                  className="btn-secondary mt-3"
                 >
                   Inicia sesión para inscribirte
                 </Link>
@@ -313,34 +256,54 @@ export default async function CursoDetallePage({ params }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="rounded-2xl bg-gray-50 px-5 py-4">
+              <div className="rounded-2xl bg-[#f6f1e8] px-5 py-4">
                 <CourseEnrollButton courseId={course.id} />
               </div>
             )}
 
             {isEnrolled ? (
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-gray-700">
-                  Progreso: {progressPercentage}%
+                <p className="text-sm font-extrabold text-[var(--ivbcc-navy)]">
+                  Progreso: {progressState.progressPercentage}%
                 </p>
-                <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-[#f3eee4]">
                   <div
                     className="h-full rounded-full bg-[var(--ivbcc-gold)] transition-all"
-                    style={{ width: `${progressPercentage}%` }}
+                    style={{ width: `${progressState.progressPercentage}%` }}
                   />
                 </div>
-                {isCourseCompleted && (
+                <p className="text-xs font-semibold text-slate-500">
+                  {progressState.completedLessons} de {progressState.totalLessons} lecciones completadas por quiz aprobado.
+                </p>
+                {progressState.certificateAvailable ? (
                   <div className="space-y-3 rounded-2xl bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
-                    <p>Curso completado 🎉</p>
+                    <p>Curso completado</p>
                     <CourseCertificateButton
-                      courseTitle={course.title}
-                      studentName={certificateStudentName}
+                      courseId={course.id}
+                      initialFirstName={profile?.first_name || ""}
+                      initialLastName={profile?.last_name || ""}
+                      userEmail={user?.email || ""}
+                      initialCertificate={
+                        existingCertificate
+                          ? toCertificateViewModel(
+                              existingCertificate as CourseCertificateRecord
+                            )
+                          : null
+                      }
                     />
                   </div>
+                ) : progressState.finalQuizUnlocked ? (
+                  <p className="form-note">
+                    Ya completaste las lecciones. Aprueba el quiz final para habilitar tu certificado.
+                  </p>
+                ) : (
+                  <p className="form-note">
+                    Aprueba el quiz obligatorio de cada lección para avanzar y desbloquear el quiz final.
+                  </p>
                 )}
               </div>
             ) : (
-              <p className="text-sm font-medium text-gray-500">
+              <p className="form-note">
                 Inscríbete en este curso para desbloquear progreso, lecciones y quizzes.
               </p>
             )}
@@ -348,17 +311,21 @@ export default async function CursoDetallePage({ params }: Props) {
         </header>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-bold text-gray-950">Lecciones</h2>
+          <h2 className="section-title text-3xl text-gray-950">Lecciones</h2>
 
           {lessons?.length ? (
             <div className="space-y-3">
-              {lessons.map((lesson) => (
-                <article
-                  key={lesson.id}
-                  className={`rounded-2xl px-5 py-4 shadow-sm ${
-                    isEnrolled ? "bg-white" : "bg-gray-50"
-                  }`}
-                >
+              {lessons.map((lesson) => {
+                const lessonState = progressState.lessonStateById.get(lesson.id);
+                const isLessonAccessible = Boolean(lessonState?.isUnlocked);
+
+                return (
+                  <article
+                    key={lesson.id}
+                    className={`premium-surface rounded-[24px] px-5 py-4 ${
+                      isLessonAccessible ? "" : "opacity-70"
+                    }`}
+                  >
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -377,28 +344,38 @@ export default async function CursoDetallePage({ params }: Props) {
                       </div>
 
                       {!isEnrolled && (
-                        <p className="mt-2 text-sm font-medium text-gray-500">
+                        <p className="mt-2 text-sm font-medium text-slate-500">
                           Inscríbete para acceder a esta lección.
+                        </p>
+                      )}
+                      {isEnrolled && !isLessonAccessible && (
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                          Debes aprobar el quiz de la lección anterior.
+                        </p>
+                      )}
+                      {isEnrolled && lessonState?.missingRequiredQuiz && isLessonAccessible && (
+                        <p className="mt-2 text-sm font-medium text-amber-700">
+                          Esta lección necesita un quiz publicado para poder completarse.
                         </p>
                       )}
                     </div>
 
-                    {isEnrolled ? (
+                    {isLessonAccessible ? (
                       <Link
                         href={`/formacion/${course.slug}/lecciones/${lesson.id}`}
-                        className="rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)]"
+                        className="btn-ghost"
                       >
                         Ver
                       </Link>
                     ) : (
-                      <span className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-400">
+                      <span className="btn-ghost pointer-events-none opacity-60">
                         Bloqueada
                       </span>
                     )}
                   </div>
 
                   {isEnrolled &&
-                    (publishedLessonQuizIdsByLesson.get(lesson.id) || []).length > 0 && (
+                    (progressState.lessonQuizIdsByLesson.get(lesson.id) || []).length > 0 && (
                       <div className="mt-4 border-t border-gray-100 pt-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                           Quizzes de la lección
@@ -413,9 +390,9 @@ export default async function CursoDetallePage({ params }: Props) {
                               return (
                                 <div
                                   key={quiz.id}
-                                  className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
+                                  className="flex items-center justify-between rounded-2xl bg-[#f6f1e8] px-4 py-3"
                                 >
-                                  <p className="text-sm font-medium text-gray-700">
+                                  <p className="text-sm font-bold text-slate-700">
                                     {quiz.title}
                                   </p>
                                   <span
@@ -430,60 +407,80 @@ export default async function CursoDetallePage({ params }: Props) {
                       </div>
                     )}
                 </article>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="rounded-2xl bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
-              Este curso aún no tiene lecciones.
-            </div>
+              <div className="premium-surface rounded-[28px] px-6 py-12 text-center text-sm text-slate-500">
+                Este curso aún no tiene lecciones.
+              </div>
           )}
         </section>
 
         <section className="mt-10 space-y-4">
-          <h2 className="text-2xl font-bold text-gray-950">Quizzes del curso</h2>
+          <h2 className="section-title text-3xl text-gray-950">Quizzes del curso</h2>
 
           {isEnrolled ? (
             quizzes?.length ? (
               <div className="space-y-3">
-                {quizzes.map((quiz) => (
+                {quizzes.map((quiz) => {
+                  const quizStatus = getQuizStatus(quiz.id);
+                  const canOpenFinalQuiz = progressState.finalQuizUnlocked;
+
+                  return (
                   <article
-                    key={quiz.id}
-                    className="flex items-center justify-between rounded-2xl bg-white px-5 py-4 shadow-sm"
+                  key={quiz.id}
+                    className={`premium-surface flex flex-col gap-4 rounded-[24px] px-5 py-4 md:flex-row md:items-center md:justify-between ${
+                      canOpenFinalQuiz ? "" : "opacity-70"
+                    }`}
                   >
                     <div>
-                      <h3 className="text-lg font-bold text-gray-950">
+                      <h3 className="section-title text-xl text-gray-950">
                         {quiz.title}
                       </h3>
                       <div className="mt-3">
                         <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getQuizStatus(quiz.id).className}`}
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${quizStatus.className}`}
                         >
-                          {getQuizStatus(quiz.id).label}
+                          {quizStatus.label}
                         </span>
                       </div>
+                      {!canOpenFinalQuiz && (
+                        <p className="mt-2 text-sm font-medium text-slate-500">
+                          🔒 Se desbloquea al completar todas las lecciones.
+                        </p>
+                      )}
                     </div>
 
-                    <Link
-                      href={`/formacion/${course.slug}/quizzes/${quiz.id}`}
-                      className="rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)]"
-                    >
-                      Responder quiz
-                    </Link>
+                    {canOpenFinalQuiz ? (
+                      <Link
+                        href={`/formacion/${course.slug}/quizzes/${quiz.id}`}
+                        className="btn-ghost"
+                      >
+                        Responder quiz final
+                      </Link>
+                    ) : (
+                      <span className="btn-ghost pointer-events-none opacity-60">
+                        Bloqueado
+                      </span>
+                    )}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <div className="rounded-2xl bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
+              <div className="premium-surface rounded-[28px] px-6 py-12 text-center text-sm text-slate-500">
                 Este curso aún no tiene quizzes publicados.
               </div>
             )
           ) : (
-            <div className="rounded-2xl bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
+            <div className="premium-surface rounded-[28px] px-6 py-12 text-center text-sm text-slate-500">
               Inscríbete en el curso para desbloquear los quizzes.
             </div>
           )}
         </section>
       </section>
+      </div>
     </main>
   );
 }

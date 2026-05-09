@@ -80,48 +80,48 @@ export default async function NoticiaDetallePage({ params }: Props) {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="premium-page">
+      <div className="site-shell pt-8">
       <Link
         href="/noticias"
-        className="mb-8 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+        className="btn-ghost mb-8"
       >
         Volver a noticias
       </Link>
+      </div>
 
       {noticia.image_url ? (
-        <div className="mb-10 flex min-h-80 w-full items-center justify-center overflow-hidden rounded-2xl bg-gray-100 p-4 shadow-sm">
-          <Image
-            src={noticia.image_url}
-            alt={noticia.title}
-            width={1200}
-            height={720}
-            sizes="(min-width: 1024px) 896px, 100vw"
-            priority
-            className="max-h-[32rem] h-auto w-auto object-contain"
-          />
+        <div className="site-shell mb-10">
+          <div className="media-frame min-h-80 rounded-[30px] bg-[#ebe6dc] shadow-lg">
+            <Image
+              src={noticia.image_url}
+              alt={noticia.title}
+              width={1400}
+              height={820}
+              sizes="(min-width: 1024px) 1180px, 100vw"
+              priority
+              className="mx-auto max-h-[34rem] h-auto w-auto object-contain p-4"
+            />
+          </div>
         </div>
       ) : null}
 
-      <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_18rem]">
+      <section className="site-shell grid gap-8 pb-16 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="mx-auto w-full max-w-3xl">
           <header
-            className={`mb-8 rounded-2xl p-8 shadow-sm ${
+            className={`mb-8 rounded-[30px] p-8 shadow-sm md:p-10 ${
               noticia.image_url
-                ? "bg-white"
-                : "bg-[var(--ivbcc-navy)] text-white"
+                ? "premium-surface"
+                : "page-hero text-white"
             }`}
           >
             <p
-              className={`text-sm font-semibold uppercase tracking-[0.18em] ${
-                noticia.image_url
-                  ? "text-[var(--ivbcc-gold)]"
-                  : "text-[var(--ivbcc-gold)]"
-              }`}
+              className="kicker"
             >
               Noticias IVBCC
             </p>
             <h1
-              className={`mt-3 text-3xl font-bold leading-tight md:text-4xl ${
+              className={`section-title mt-4 text-4xl md:text-5xl ${
                 noticia.image_url ? "text-gray-950" : "text-white"
               }`}
             >
@@ -137,7 +137,7 @@ export default async function NoticiaDetallePage({ params }: Props) {
             </p>
 
             <p
-              className={`mt-5 text-lg leading-relaxed ${
+              className={`mt-6 text-lg leading-relaxed ${
                 noticia.image_url ? "text-gray-600" : "text-white/85"
               }`}
             >
@@ -145,13 +145,13 @@ export default async function NoticiaDetallePage({ params }: Props) {
             </p>
           </header>
 
-          <article className="rounded-2xl bg-white p-8 whitespace-pre-line text-lg leading-relaxed text-gray-800 shadow-sm">
+          <article className="premium-surface prose-premium whitespace-pre-line rounded-[30px] p-8 md:p-10">
             {noticia.content}
           </article>
 
-          <section className="mt-10 grid gap-4 rounded-2xl bg-white p-5 shadow-sm md:grid-cols-3">
+          <section className="premium-surface mt-10 grid gap-4 rounded-[28px] p-5 md:grid-cols-3">
             <div className="md:col-span-3">
-              <h2 className="text-lg font-bold text-gray-950">
+              <h2 className="section-title text-xl text-gray-950">
                 Navegar noticias
               </h2>
             </div>
@@ -160,7 +160,7 @@ export default async function NoticiaDetallePage({ params }: Props) {
               {previousNews ? (
                 <Link
                   href={`/noticias/${previousNews.slug}`}
-                  className="inline-flex rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-gray-50"
+                  className="btn-ghost"
                 >
                   Noticia anterior
                 </Link>
@@ -172,7 +172,7 @@ export default async function NoticiaDetallePage({ params }: Props) {
             <div className="md:text-center">
               <Link
                 href="/noticias"
-                className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                className="btn-primary"
               >
                 Volver a noticias
               </Link>
@@ -182,7 +182,7 @@ export default async function NoticiaDetallePage({ params }: Props) {
               {nextNews ? (
                 <Link
                   href={`/noticias/${nextNews.slug}`}
-                  className="inline-flex rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-gray-50"
+                  className="btn-ghost"
                 >
                   Siguiente noticia
                 </Link>
@@ -193,8 +193,8 @@ export default async function NoticiaDetallePage({ params }: Props) {
           </section>
 
           {moreRecentNews.length > 0 && (
-            <section className="mt-10 rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-bold text-gray-950">
+            <section className="premium-surface mt-10 rounded-[30px] p-6">
+              <h2 className="section-title text-3xl text-gray-950">
                 Más noticias recientes
               </h2>
               <div className="mt-5 space-y-4">
@@ -211,7 +211,7 @@ export default async function NoticiaDetallePage({ params }: Props) {
                     </h3>
                     <Link
                       href={`/noticias/${item.slug}`}
-                      className="mt-2 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                      className="mt-2 inline-flex text-sm font-extrabold text-[var(--ivbcc-navy)]"
                     >
                       Ver noticia
                     </Link>

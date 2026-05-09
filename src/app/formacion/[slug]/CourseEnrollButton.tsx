@@ -58,12 +58,12 @@ export default function CourseEnrollButton({ courseId }: Props) {
         type="button"
         onClick={handleEnroll}
         disabled={isSubmitting}
-        className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+        className="btn-primary disabled:opacity-60"
       >
         {isSubmitting ? "Inscribiendo..." : "Inscribirme al curso"}
       </button>
 
-      {message && <p className="text-sm font-medium text-gray-600">{message}</p>}
+      {message && <p className="form-note">{message}</p>}
     </div>
   );
 }

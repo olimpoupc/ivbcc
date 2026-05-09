@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  QUIZ_PASSING_PERCENTAGE,
+  buildCourseProgressState,
+  getQuizPercentage,
+} from "@/lib/course-progress";
 import QuizResponseForm from "./QuizResponseForm";
 
 type Props = {
@@ -65,14 +70,15 @@ export default async function QuizDetallePage({ params }: Props) {
 
   if (!user) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <section className="mx-auto max-w-3xl rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-          <p className="text-sm font-medium text-gray-600">
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Acceso restringido</p>
+          <h1 className="section-title mt-3 text-3xl text-gray-950">
             Debes inscribirte para acceder a este quiz
-          </p>
+          </h1>
           <Link
             href={`/formacion/${course.slug}`}
-            className="mt-4 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+            className="btn-primary mt-6"
           >
             Volver al curso
           </Link>
@@ -90,14 +96,113 @@ export default async function QuizDetallePage({ params }: Props) {
 
   if (!enrollment) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <section className="mx-auto max-w-3xl rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-          <p className="text-sm font-medium text-gray-600">
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Formación IVBCC</p>
+          <h1 className="section-title mt-3 text-3xl text-gray-950">
             Debes inscribirte para acceder a este quiz
+          </h1>
+          <Link
+            href={`/formacion/${course.slug}`}
+            className="btn-primary mt-6"
+          >
+            Volver al curso
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const { data: lessons, error: lessonsError } = await supabase
+    .from("lessons")
+    .select('id,"order"')
+    .eq("course_id", course.id)
+    .order("order", { ascending: true });
+
+  if (lessonsError) {
+    return <main className="p-10">Error cargando lecciones.</main>;
+  }
+
+  const { data: allPublishedQuizzes, error: allPublishedQuizzesError } =
+    await supabase
+      .from("quizzes")
+      .select("id,lesson_id")
+      .eq("course_id", course.id)
+      .eq("status", "published");
+
+  if (allPublishedQuizzesError) {
+    return <main className="p-10">Error cargando quizzes.</main>;
+  }
+
+  const publishedQuizIds = (allPublishedQuizzes || []).map((publishedQuiz) => publishedQuiz.id);
+  const { data: quizAttempts, error: existingAttemptError } =
+    publishedQuizIds.length
+      ? await supabase
+          .from("quiz_attempts")
+          .select("quiz_id,score,total_questions,created_at")
+          .eq("user_id", user.id)
+          .in("quiz_id", publishedQuizIds)
+          .order("created_at", { ascending: false })
+      : { data: [], error: null };
+
+  if (existingAttemptError) {
+    return <main className="p-10">Error cargando intentos del quiz.</main>;
+  }
+
+  const progressState = buildCourseProgressState({
+    lessons: (lessons || []).map((lesson) => ({
+      id: lesson.id,
+      order: lesson.order,
+    })),
+    quizzes: (allPublishedQuizzes || []).map((publishedQuiz) => ({
+      id: publishedQuiz.id,
+      lesson_id: publishedQuiz.lesson_id,
+    })),
+    attempts: quizAttempts || [],
+    isEnrolled: true,
+  });
+
+  const isFinalQuiz = !quiz.lesson_id;
+  const lessonState = quiz.lesson_id
+    ? progressState.lessonStateById.get(quiz.lesson_id)
+    : null;
+
+  if (quiz.lesson_id && !lessonState?.isUnlocked) {
+    return (
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Quiz bloqueado</p>
+          <h1 className="section-title mt-3 text-3xl text-gray-950">
+            Debes completar la lección anterior.
+          </h1>
+          <p className="muted-copy mt-4 text-sm">
+            Aprueba el quiz de la lección previa para desbloquear este quiz.
           </p>
           <Link
             href={`/formacion/${course.slug}`}
-            className="mt-4 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+            className="btn-primary mt-6"
+          >
+            Volver al curso
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (isFinalQuiz && !progressState.finalQuizUnlocked) {
+    return (
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Quiz final bloqueado</p>
+          <h1 className="section-title mt-3 text-3xl text-gray-950">
+            Completa todas las lecciones primero.
+          </h1>
+          <p className="muted-copy mt-4 text-sm">
+            El quiz final se habilita cuando todos los quizzes de lección están aprobados.
+          </p>
+          <Link
+            href={`/formacion/${course.slug}`}
+            className="btn-primary mt-6"
           >
             Volver al curso
           </Link>
@@ -111,63 +216,63 @@ export default async function QuizDetallePage({ params }: Props) {
     options: (options || []).filter((option) => option.question_id === question.id),
   }));
 
-  const { data: existingAttempts, error: existingAttemptError } = await supabase
-    .from("quiz_attempts")
-    .select("score,total_questions,created_at")
-    .eq("quiz_id", quiz.id)
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (existingAttemptError) {
-    return <main className="p-10">Error cargando intento del quiz.</main>;
-  }
-
-  const existingAttempt = existingAttempts?.[0] ?? null;
-
-  const savedPercentage = existingAttempt?.total_questions
-    ? Math.round((existingAttempt.score / existingAttempt.total_questions) * 100)
-    : 0;
-  const passed = savedPercentage >= 60;
+  const existingAttempt = progressState.latestAttemptByQuiz.get(quiz.id) ?? null;
+  const savedPercentage = getQuizPercentage(existingAttempt);
+  const passed = savedPercentage >= QUIZ_PASSING_PERCENTAGE;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
-      <section className="mx-auto max-w-3xl">
-        <header className="mb-8 border-b border-gray-200 pb-8">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+    <main className="premium-page py-12">
+      <section className="site-shell max-w-4xl">
+        <header className="page-hero mb-8">
+          <div className="hero-inner p-7 md:p-10">
+          <p className="kicker">
             {course.title}
           </p>
-          <h1 className="mb-5 text-3xl font-bold leading-tight text-gray-950 md:text-4xl">
+          <h1 className="section-title mt-4 max-w-3xl text-4xl md:text-5xl">
             {quiz.title}
           </h1>
 
           <Link
             href={`/formacion/${course.slug}`}
-            className="inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+            className="btn-ghost mt-7 border-white/20 bg-white/10 text-white hover:bg-white/15"
           >
             Volver al curso
           </Link>
+          </div>
         </header>
 
-        {existingAttempt ? (
-          <div className="rounded-2xl bg-white px-6 py-8 shadow-sm">
-            <p className="text-lg font-bold text-gray-950">
+        {passed && existingAttempt ? (
+          <div className="premium-surface rounded-[28px] px-6 py-8">
+            <p className="kicker">
               Ya respondiste este quiz
             </p>
+            <h2 className="section-title mt-3 text-3xl text-gray-950">
+              {passed ? "Aprobaste" : "No aprobaste"}
+            </h2>
             <p className="mt-4 text-sm font-semibold text-gray-700">
               Resultado: {existingAttempt.score} de {existingAttempt.total_questions}
             </p>
             <p className="mt-2 text-sm font-semibold text-gray-700">
               Porcentaje: {savedPercentage}%
             </p>
-            <p className="mt-2 text-sm font-semibold text-gray-700">
-              {passed ? "Aprobaste ✅" : "No aprobaste ❌"}
-            </p>
+            <Link
+              href={`/formacion/${course.slug}`}
+              className="btn-primary mt-6"
+            >
+              Volver al curso
+            </Link>
           </div>
         ) : questionsWithOptions.length ? (
+          <>
+          {existingAttempt ? (
+            <div className="form-note mb-6 border-amber-200 bg-amber-50/80 text-amber-800">
+              Tu último intento fue de {savedPercentage}%. Puedes intentarlo nuevamente.
+            </div>
+          ) : null}
           <QuizResponseForm quizId={quiz.id} questions={questionsWithOptions} />
+          </>
         ) : (
-          <div className="rounded-2xl bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
+          <div className="premium-surface rounded-[28px] px-6 py-12 text-center text-sm text-slate-500">
             Este quiz aún no tiene preguntas disponibles.
           </div>
         )}

@@ -114,6 +114,12 @@ export default async function AdminFormacionPage() {
                     Ver lecciones
                   </Link>
                   <Link
+                    href={`/admin/certificados?course=${course.id}`}
+                    className="mt-2 rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                  >
+                    Ver certificados emitidos
+                  </Link>
+                  <Link
                     href={`/admin/formacion/${course.id}/editar`}
                     className="mt-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
                   >

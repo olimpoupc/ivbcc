@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildContentMetadata, resolveSeoDescription, seoConfig } from "@/lib/seo";
+import EventCountdown from "@/components/ui/EventCountdown";
 import EventRegistrationForm from "./EventRegistrationForm";
 import ShareEventButtons from "./ShareEventButtons";
 
@@ -84,52 +85,56 @@ export default async function EventoDetallePage({ params }: Props) {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="premium-page">
+      <div className="site-shell pt-8">
       <Link
         href="/eventos"
-        className="mb-8 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+        className="btn-ghost mb-8"
       >
         Volver a eventos
       </Link>
+      </div>
 
       {evento.image_url ? (
-        <div className="mb-10 flex min-h-80 w-full items-center justify-center overflow-hidden rounded-2xl bg-gray-100 p-4 shadow-sm">
-          <Image
-            src={evento.image_url}
-            alt={evento.title}
-            width={1200}
-            height={720}
-            sizes="(min-width: 1024px) 896px, 100vw"
-            priority
-            className="max-h-[32rem] h-auto w-auto object-contain"
-          />
+        <div className="site-shell mb-10">
+          <div className="media-frame min-h-80 rounded-[30px] bg-[#ebe6dc] shadow-lg">
+            <Image
+              src={evento.image_url}
+              alt={evento.title}
+              width={1400}
+              height={820}
+              sizes="(min-width: 1024px) 1180px, 100vw"
+              priority
+              className="mx-auto max-h-[34rem] h-auto w-auto object-contain p-4"
+            />
+          </div>
         </div>
       ) : null}
 
-      <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_18rem]">
+      <section className="site-shell grid gap-8 pb-16 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="mx-auto w-full max-w-3xl space-y-8">
           <header
-            className={`rounded-2xl p-8 shadow-sm ${
+            className={`rounded-[30px] p-8 shadow-sm md:p-10 ${
               evento.image_url
-                ? "bg-white"
-                : "bg-[var(--ivbcc-navy)] text-white"
+                ? "premium-surface"
+                : "page-hero text-white"
             }`}
           >
             <div className="flex flex-wrap gap-2">
               <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                className={`badge ${
                   evento.image_url
-                    ? "bg-slate-100 text-slate-700"
-                    : "bg-white/10 text-white"
+                    ? ""
+                    : "border-white/10 bg-white/10 text-white"
                 }`}
               >
                 Evento
               </span>
               <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                className={`badge ${
                   evento.registration_enabled
-                    ? "bg-green-50 text-green-700"
-                    : "bg-gray-100 text-gray-600"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-[#e8e2d6] bg-[#f3eee4] text-slate-600"
                 }`}
               >
                 {evento.registration_enabled
@@ -139,7 +144,7 @@ export default async function EventoDetallePage({ params }: Props) {
             </div>
 
             <h1
-              className={`mt-4 text-3xl font-bold leading-tight md:text-4xl ${
+              className={`section-title mt-5 text-4xl md:text-5xl ${
                 evento.image_url ? "text-gray-950" : "text-white"
               }`}
             >
@@ -156,12 +161,12 @@ export default async function EventoDetallePage({ params }: Props) {
             </div>
           </header>
 
-          <section className="rounded-2xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-950">
+          <section className="premium-surface rounded-[30px] p-8">
+            <h2 className="section-title text-3xl text-gray-950">
               Información principal
             </h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-2xl bg-[#f6f1e8] p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Fecha y hora
                 </p>
@@ -169,7 +174,7 @@ export default async function EventoDetallePage({ params }: Props) {
                   {formatDateTimeColombia(evento.event_date)}
                 </p>
               </div>
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-2xl bg-[#f6f1e8] p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Ubicación
                 </p>
@@ -178,31 +183,36 @@ export default async function EventoDetallePage({ params }: Props) {
                 </p>
               </div>
             </div>
+            {evento.event_date ? (
+              <div className="mt-5">
+                <EventCountdown targetDate={evento.event_date} />
+              </div>
+            ) : null}
           </section>
 
-          <section className="rounded-2xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-950">Descripción</h2>
-            <article className="mt-5 whitespace-pre-line text-lg leading-relaxed text-gray-800">
+          <section className="premium-surface rounded-[30px] p-8">
+            <h2 className="section-title text-3xl text-gray-950">Descripción</h2>
+            <article className="prose-premium mt-5 whitespace-pre-line">
               {evento.description}
             </article>
           </section>
 
-          <section className="rounded-2xl bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-950">Inscripción</h2>
+          <section className="premium-surface rounded-[30px] p-8">
+            <h2 className="section-title text-3xl text-gray-950">Inscripción</h2>
             <div className="mt-5">
               {evento.registration_enabled ? (
                 <EventRegistrationForm eventId={evento.id} />
               ) : (
-                <div className="rounded-xl bg-slate-50 px-5 py-4 text-sm font-medium text-gray-600">
+                <div className="rounded-2xl bg-[#f6f1e8] px-5 py-4 text-sm font-medium text-gray-600">
                   Inscripciones no disponibles para este evento.
                 </div>
               )}
             </div>
           </section>
 
-          <section className="grid gap-4 rounded-2xl bg-white p-5 shadow-sm md:grid-cols-3">
+          <section className="premium-surface grid gap-4 rounded-[28px] p-5 md:grid-cols-3">
             <div className="md:col-span-3">
-              <h2 className="text-lg font-bold text-gray-950">
+              <h2 className="section-title text-xl text-gray-950">
                 Navegar eventos
               </h2>
             </div>
@@ -211,7 +221,7 @@ export default async function EventoDetallePage({ params }: Props) {
               {previousEvent ? (
                 <Link
                   href={`/eventos/${previousEvent.slug}`}
-                  className="inline-flex rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-gray-50"
+                  className="btn-ghost"
                 >
                   Evento anterior
                 </Link>
@@ -223,7 +233,7 @@ export default async function EventoDetallePage({ params }: Props) {
             <div className="md:text-center">
               <Link
                 href="/eventos"
-                className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                className="btn-primary"
               >
                 Volver a eventos
               </Link>
@@ -233,7 +243,7 @@ export default async function EventoDetallePage({ params }: Props) {
               {nextEvent ? (
                 <Link
                   href={`/eventos/${nextEvent.slug}`}
-                  className="inline-flex rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:bg-gray-50"
+                  className="btn-ghost"
                 >
                   Siguiente evento
                 </Link>
@@ -244,8 +254,8 @@ export default async function EventoDetallePage({ params }: Props) {
           </section>
 
           {moreEvents.length > 0 && (
-            <section className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-bold text-gray-950">Más eventos</h2>
+            <section className="premium-surface rounded-[30px] p-6">
+              <h2 className="section-title text-3xl text-gray-950">Más eventos</h2>
               <div className="mt-5 space-y-4">
                 {moreEvents.map((item) => (
                   <article
@@ -263,7 +273,7 @@ export default async function EventoDetallePage({ params }: Props) {
                     </p>
                     <Link
                       href={`/eventos/${item.slug}`}
-                      className="mt-2 inline-flex text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                      className="mt-2 inline-flex text-sm font-extrabold text-[var(--ivbcc-navy)]"
                     >
                       Ver evento
                     </Link>

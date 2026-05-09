@@ -92,13 +92,13 @@ export default function ChatbotWidget({ siteSettings }: Props) {
       {isOpen && (
         <section
           aria-label="Asistente virtual IVBCC"
-          className="max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          className="max-h-[calc(100vh-7rem)] w-[calc(100vw-2.5rem)] max-w-sm overflow-hidden rounded-[26px] border border-[#e8e2d6] bg-white shadow-2xl"
         >
-          <div className="bg-[var(--ivbcc-navy)] px-5 py-4 text-white">
+          <div className="dark-panel rounded-none border-0 px-5 py-4 text-white shadow-none">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold">Asistente IVBCC</p>
-                <p className="mt-1 text-xs text-white/75">
+                <p className="font-display text-base font-extrabold">Asistente IVBCC</p>
+                <p className="mt-1 text-xs leading-5 text-white/68">
                   Respuestas rápidas para orientarte
                 </p>
               </div>
@@ -114,8 +114,8 @@ export default function ChatbotWidget({ siteSettings }: Props) {
           </div>
 
           <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-5">
-            <div className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-gray-700">
-              Hola 👋 Soy el asistente virtual de IVBCC. ¿En qué podemos
+            <div className="rounded-2xl bg-[#f6f1e8] p-4 text-sm leading-6 text-slate-700">
+              Hola, soy el asistente virtual de IVBCC. ¿En qué podemos
               ayudarte?
             </div>
 
@@ -136,12 +136,12 @@ export default function ChatbotWidget({ siteSettings }: Props) {
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedItem(item)}
-                    className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[var(--ivbcc-gold)] hover:bg-slate-50"
+                    className="rounded-2xl border border-[#e8e2d6] bg-white p-4 text-left shadow-sm transition hover:border-[var(--ivbcc-gold)] hover:bg-[#fbfaf7]"
                   >
                     <span className="text-sm font-bold text-gray-950">
                       {item.title}
                     </span>
-                    <span className="mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    <span className="badge mt-3">
                       {categoryLabels[item.category] || "General"}
                     </span>
                   </button>
@@ -160,7 +160,7 @@ export default function ChatbotWidget({ siteSettings }: Props) {
                     href={whatsappUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                    className="btn-primary"
                   >
                     Escribir por WhatsApp
                   </a>
@@ -170,12 +170,12 @@ export default function ChatbotWidget({ siteSettings }: Props) {
 
             {selectedItem && (
               <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-slate-200 p-4">
+                <div className="rounded-2xl border border-[#e8e2d6] p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-bold text-gray-950">
                       {selectedItem.title}
                     </h2>
-                    <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    <span className="badge">
                       {categoryLabels[selectedItem.category] || "General"}
                     </span>
                   </div>
@@ -197,7 +197,7 @@ export default function ChatbotWidget({ siteSettings }: Props) {
                         ? "noreferrer"
                         : undefined
                     }
-                    className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                    className="btn-primary"
                   >
                     {selectedItem.button_text}
                   </a>
@@ -207,14 +207,14 @@ export default function ChatbotWidget({ siteSettings }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedItem(null)}
-                    className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="btn-ghost"
                   >
                     Volver a opciones
                   </button>
                   <button
                     type="button"
                     onClick={closePanel}
-                    className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="btn-ghost"
                   >
                     Cerrar
                   </button>
@@ -230,9 +230,9 @@ export default function ChatbotWidget({ siteSettings }: Props) {
         onClick={() => setIsOpen((current) => !current)}
         aria-expanded={isOpen}
         aria-label={isOpen ? "Cerrar ayuda" : "Abrir ayuda"}
-        className="inline-flex items-center gap-2 rounded-full bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-xl transition hover:-translate-y-0.5 hover:opacity-95"
+        className="btn-primary shadow-xl"
       >
-        <span aria-hidden="true">💬</span>
+        <span aria-hidden="true">?</span>
         Ayuda
       </button>
     </div>

@@ -91,28 +91,30 @@ export default async function ContactoPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <section className="overflow-hidden rounded-[28px] bg-[var(--ivbcc-navy)] px-8 py-12 text-white shadow-sm md:px-12">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--ivbcc-gold)]">
+    <main className="premium-page">
+      <section className="site-shell-wide pt-8">
+        <div className="page-hero">
+        <div className="hero-inner px-6 py-12 md:px-10 md:py-16">
+          <p className="kicker">
             IVBCC
           </p>
-          <h1 className="mt-4 text-4xl font-bold leading-tight md:text-5xl">
+          <h1 className="display-title mt-4 text-5xl md:text-7xl">
             Contáctanos
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 md:text-lg">
             Estamos para servirte, orientarte y acompañarte.
           </p>
         </div>
+        </div>
       </section>
 
-      <section className="mt-10 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="site-shell-wide mt-10 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="space-y-8">
-          <article className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <article className="premium-surface rounded-[30px] p-6 md:p-8">
+            <p className="kicker">
               Información rápida
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-gray-950">
+            <h2 className="section-title mt-2 text-3xl text-gray-950">
               Estamos cerca de ti
             </h2>
 
@@ -146,7 +148,7 @@ export default async function ContactoPage() {
                 rel="noreferrer"
                 eventName="click_whatsapp"
                 eventParams={{ location: "contact_page" }}
-                className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                className="btn-primary"
               >
                 Escribir por WhatsApp
               </TrackedLink>
@@ -154,14 +156,14 @@ export default async function ContactoPage() {
                 href={mapsHref}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-lg border border-[var(--ivbcc-navy)] px-5 py-3 text-sm font-bold text-[var(--ivbcc-navy)] transition hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                className="btn-ghost"
               >
                 Abrir en Google Maps
               </a>
             </div>
           </article>
 
-          <article className="overflow-hidden rounded-3xl bg-white shadow-sm">
+          <article className="overflow-hidden rounded-[30px] bg-white shadow-lg">
             <div className="aspect-[16/11] w-full">
               <iframe
                 src={mapEmbedUrl}
@@ -177,12 +179,12 @@ export default async function ContactoPage() {
         <ContactForm />
       </section>
 
-      <section className="mt-12">
+      <section className="site-shell-wide mt-12">
         <div className="mb-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <p className="kicker">
             Horarios y acompañamiento
           </p>
-          <h2 className="mt-2 text-2xl font-bold text-gray-950">
+          <h2 className="section-title mt-2 text-4xl text-gray-950">
             Espacios para conectar
           </h2>
         </div>
@@ -191,10 +193,10 @@ export default async function ContactoPage() {
           {scheduleCards.map((card) => (
             <article
               key={card.title}
-              className="rounded-2xl bg-white p-6 shadow-sm"
+              className="premium-surface rounded-[24px] p-6"
             >
-              <h3 className="text-lg font-bold text-gray-950">{card.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-600">
+              <h3 className="section-title text-xl text-gray-950">{card.title}</h3>
+              <p className="muted-copy mt-3 text-sm">
                 {card.description}
               </p>
             </article>
@@ -202,11 +204,11 @@ export default async function ContactoPage() {
         </div>
       </section>
 
-      <section className="mt-12 rounded-3xl bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+      <section className="site-shell-wide mt-12 rounded-[30px] premium-surface p-8">
+        <p className="kicker">
           Redes
         </p>
-        <h2 className="mt-2 text-2xl font-bold text-gray-950">
+        <h2 className="section-title mt-2 text-3xl text-gray-950">
           Síguenos y mantente conectado
         </h2>
 
@@ -225,7 +227,7 @@ export default async function ContactoPage() {
                     : "click_youtube"
               }
               eventParams={{ location: "contact_page" }}
-              className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] transition hover:border-[var(--ivbcc-gold)]"
+              className="btn-ghost"
             >
               {link.label}
             </TrackedLink>

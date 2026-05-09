@@ -1,147 +1,185 @@
 "use client";
 
+import type { FormEvent } from "react";
+import { useState, useTransition } from "react";
+import type { CertificateViewModel } from "@/lib/certificates";
+import { getOrCreateCourseCertificate } from "./certificate-actions";
+
 type Props = {
-  courseTitle: string;
-  studentName: string;
+  courseId: string;
+  initialFirstName?: string;
+  initialLastName?: string;
+  userEmail?: string;
+  initialCertificate?: CertificateViewModel | null;
 };
 
-function formatCertificateDate() {
-  return new Date().toLocaleDateString("es-CO", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Bogota",
-  });
-}
-
 export default function CourseCertificateButton({
-  courseTitle,
-  studentName,
+  courseId,
+  initialFirstName = "",
+  initialLastName = "",
+  userEmail = "",
+  initialCertificate = null,
 }: Props) {
-  function handleDownloadCertificate() {
-    const certificateWindow = window.open("", "_blank", "width=1100,height=800");
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState("");
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [showProfileForm, setShowProfileForm] = useState(
+    !initialCertificate && (!initialFirstName.trim() || !initialLastName.trim())
+  );
+  const [certificate, setCertificate] = useState<CertificateViewModel | null>(
+    initialCertificate
+  );
 
-    if (!certificateWindow) {
-      alert("No pudimos abrir la vista del certificado.");
-      return;
-    }
+  function handleGenerateCertificate(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setMessage("");
 
-    const issuedDate = formatCertificateDate();
+    startTransition(async () => {
+      let result;
 
-    certificateWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Certificado de finalización</title>
-          <style>
-            body {
-              margin: 0;
-              font-family: Arial, Helvetica, sans-serif;
-              background: #f6f1df;
-              color: #12284c;
-            }
-            .certificate {
-              max-width: 980px;
-              margin: 40px auto;
-              background: white;
-              border: 10px solid #c8a64d;
-              padding: 56px;
-              text-align: center;
-              box-sizing: border-box;
-            }
-            .eyebrow {
-              letter-spacing: 0.25em;
-              text-transform: uppercase;
-              font-size: 12px;
-              font-weight: 700;
-              color: #c8a64d;
-            }
-            h1 {
-              margin: 18px 0 10px;
-              font-size: 42px;
-            }
-            h2 {
-              margin: 28px 0 8px;
-              font-size: 34px;
-            }
-            p {
-              margin: 12px 0;
-              font-size: 18px;
-              line-height: 1.7;
-            }
-            .course {
-              font-size: 28px;
-              font-weight: 700;
-              color: #12284c;
-            }
-            .footer {
-              margin-top: 48px;
-              display: flex;
-              justify-content: space-between;
-              gap: 24px;
-              text-align: left;
-            }
-            .signature {
-              flex: 1;
-              border-top: 1px solid #12284c;
-              padding-top: 12px;
-              font-size: 15px;
-            }
-            .print-note {
-              margin-top: 24px;
-              font-size: 14px;
-              color: #666;
-            }
-            @media print {
-              body {
-                background: white;
-              }
-              .certificate {
-                margin: 0;
-                border-width: 8px;
-              }
-              .print-note {
-                display: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <section class="certificate">
-            <div class="eyebrow">Iglesia Valle de Bendición Cruzada Cristiana</div>
-            <h1>Certificado de finalización</h1>
-            <p>Se certifica que</p>
-            <h2>${studentName}</h2>
-            <p>ha completado satisfactoriamente el curso</p>
-            <p class="course">${courseTitle}</p>
-            <p>en la plataforma de formación de IVBCC.</p>
-            <div class="footer">
-              <div class="signature">
-                Iglesia Valle de Bendición Cruzada Cristiana
-              </div>
-              <div class="signature">
-                Fecha de expedición: ${issuedDate}
-              </div>
-            </div>
-            <p class="print-note">Usa la opción Imprimir o Guardar como PDF desde el navegador.</p>
-          </section>
-        </body>
-      </html>
-    `);
+      try {
+        result = await getOrCreateCourseCertificate(courseId, {
+          firstName,
+          lastName,
+        });
+      } catch (error) {
+        setMessage(
+          error instanceof Error
+            ? `Error generando certificado: ${error.message}`
+            : "Error generando certificado."
+        );
+        return;
+      }
 
-    certificateWindow.document.close();
-    certificateWindow.focus();
-    certificateWindow.print();
+      if (!result.ok) {
+        if ("reason" in result && result.reason === "profile_required") {
+          setFirstName(result.firstName);
+          setLastName(result.lastName);
+          setShowProfileForm(true);
+        }
+
+        setMessage(result.message);
+        return;
+      }
+
+      setCertificate(result.certificate);
+      setShowProfileForm(false);
+      setMessage("Certificado generado correctamente.");
+    });
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDownloadCertificate}
-      className="rounded-lg bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
-    >
-      Descargar certificado
-    </button>
+    <div className="space-y-5">
+      {!certificate && showProfileForm ? (
+        <form
+          onSubmit={handleGenerateCertificate}
+          className="space-y-4 rounded-2xl border border-green-200 bg-white p-5"
+        >
+          <div>
+            <p className="kicker">Certificado</p>
+            <h3 className="section-title mt-2 text-2xl text-gray-950">
+              Completa los datos para tu certificado
+            </h3>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="form-label">
+              Nombre
+              <input
+                type="text"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                required
+                className="form-control mt-2"
+              />
+            </label>
+
+            <label className="form-label">
+              Apellido
+              <input
+                type="text"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                required
+                className="form-control mt-2"
+              />
+            </label>
+          </div>
+
+          {userEmail ? (
+            <label className="form-label">
+              Correo
+              <input
+                type="email"
+                value={userEmail}
+                readOnly
+                className="form-control mt-2"
+              />
+            </label>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="btn-secondary disabled:opacity-60"
+          >
+            {isPending ? "Guardando..." : "Guardar y generar certificado"}
+          </button>
+        </form>
+      ) : !certificate ? (
+        <button
+          type="button"
+          onClick={() => handleGenerateCertificate()}
+          disabled={isPending}
+          className="btn-secondary disabled:opacity-60"
+        >
+          {isPending ? "Generando certificado..." : "Generar certificado"}
+        </button>
+      ) : null}
+
+      {message ? (
+        <p
+          className={`form-note ${
+            certificate
+              ? "border-green-200 bg-green-50/80 text-green-800"
+              : "border-amber-200 bg-amber-50/80 text-amber-800"
+          }`}
+        >
+          {message}
+        </p>
+      ) : null}
+
+      {certificate ? (
+        <div className="space-y-3 rounded-2xl border border-green-200 bg-white p-5">
+          <div>
+            <p className="text-sm font-semibold text-green-700">
+              Certificado listo.
+            </p>
+            <p className="mt-1 font-mono text-xs font-bold text-[var(--ivbcc-navy)]">
+              Código: {certificate.code}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={certificate.verificationUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary"
+            >
+              Abrir certificado
+            </a>
+            <a
+              href={certificate.verificationUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-ghost"
+            >
+              Verificar
+            </a>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

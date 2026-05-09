@@ -128,16 +128,16 @@ export default function ContactForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl bg-white p-6 shadow-sm md:p-8"
+      className="premium-surface rounded-[30px] p-6 md:p-8"
     >
       <div className="mb-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+        <p className="kicker">
           Formulario
         </p>
-        <h2 className="mt-2 text-2xl font-bold text-gray-950">
+        <h2 className="section-title mt-2 text-3xl text-gray-950">
           Escríbenos con confianza
         </h2>
-        <p className="mt-3 text-sm leading-6 text-gray-600">
+        <p className="muted-copy mt-3 text-sm">
           Estamos para servirte, acompañarte y ayudarte a encontrar la ruta correcta.
         </p>
       </div>
@@ -154,7 +154,7 @@ export default function ContactForm() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           />
         </div>
 
@@ -167,7 +167,7 @@ export default function ContactForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           />
         </div>
 
@@ -179,7 +179,7 @@ export default function ContactForm() {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           />
         </div>
 
@@ -191,7 +191,7 @@ export default function ContactForm() {
             type="text"
             value={churchName}
             onChange={(e) => setChurchName(e.target.value)}
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           />
         </div>
 
@@ -204,7 +204,7 @@ export default function ContactForm() {
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           />
         </div>
 
@@ -215,7 +215,7 @@ export default function ContactForm() {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as ContactCategory)}
-            className="w-full rounded-lg border px-4 py-3"
+            className="form-control"
           >
             {categoryOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -235,14 +235,14 @@ export default function ContactForm() {
           onChange={(e) => setMessage(e.target.value)}
           required
           rows={6}
-          className="w-full rounded-lg border px-4 py-3"
+          className="form-control min-h-40"
         />
       </div>
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-6 inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+        className="btn-primary mt-6 disabled:opacity-60"
       >
         {isSubmitting ? "Enviando..." : "Enviar mensaje"}
       </button>

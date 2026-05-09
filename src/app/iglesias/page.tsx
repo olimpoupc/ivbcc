@@ -29,58 +29,60 @@ const upcomingChurches = [
 
 export default function IglesiasPage() {
   return (
-    <main className="bg-[#faf8f2] text-gray-900">
-      <section className="bg-[var(--ivbcc-navy)] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--ivbcc-gold)]">
+    <main className="premium-page">
+      <section className="site-shell-wide pt-8">
+        <div className="page-hero">
+        <div className="hero-inner px-6 py-12 md:px-10 md:py-16">
+          <p className="kicker">
             Comunidad IVBCC
           </p>
-          <h1 className="mt-5 text-4xl font-bold leading-tight md:text-5xl">
+          <h1 className="display-title mt-5 text-5xl md:text-7xl">
             Iglesias
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/85">
             Conoce nuestras sedes y puntos de encuentro.
           </p>
         </div>
+        </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-14">
+      <section className="site-shell-wide py-14">
         <div className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+          <p className="kicker">
             Sede principal
           </p>
-          <h2 className="mt-3 text-3xl font-bold text-gray-950">
+          <h2 className="section-title mt-3 text-4xl text-gray-950">
             Nuestra casa en Valledupar
           </h2>
         </div>
 
-        <article className="rounded-2xl bg-white p-8 shadow-sm">
-          <h3 className="text-2xl font-bold text-gray-950">{mainChurch.name}</h3>
+        <article className="premium-surface rounded-[30px] p-8">
+          <h3 className="section-title text-3xl text-gray-950">{mainChurch.name}</h3>
 
           <div className="mt-6 grid gap-6 md:grid-cols-3">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+              <p className="kicker">
                 Ciudad
               </p>
-              <p className="mt-2 text-base leading-7 text-gray-600">
+              <p className="muted-copy mt-2">
                 {mainChurch.city}
               </p>
             </div>
 
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+              <p className="kicker">
                 Dirección
               </p>
-              <p className="mt-2 text-base leading-7 text-gray-600">
+              <p className="muted-copy mt-2">
                 {mainChurch.address}
               </p>
             </div>
 
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+              <p className="kicker">
                 Teléfono
               </p>
-              <p className="mt-2 text-base leading-7 text-gray-600">
+              <p className="muted-copy mt-2">
                 {mainChurch.phone}
               </p>
             </div>
@@ -90,22 +92,22 @@ export default function IglesiasPage() {
             href={mainChurch.mapsUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-8 inline-block rounded-lg bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            className="btn-secondary mt-8"
           >
             Ver en Google Maps
           </a>
         </article>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 pb-16">
+      <section className="site-shell-wide pb-16">
         <div className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+          <p className="kicker">
             Otras sedes
           </p>
-          <h2 className="mt-3 text-3xl font-bold text-gray-950">
+          <h2 className="section-title mt-3 text-4xl text-gray-950">
             Caminando hacia nuevos puntos de encuentro
           </h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600">
+          <p className="muted-copy mt-4 max-w-3xl">
             Próximamente agregaremos más sedes.
           </p>
         </div>
@@ -114,13 +116,13 @@ export default function IglesiasPage() {
           {upcomingChurches.map((church) => (
             <article
               key={church.name}
-              className="rounded-2xl bg-white p-6 shadow-sm"
+              className="premium-surface rounded-[24px] p-6"
             >
-              <h3 className="text-xl font-bold text-gray-950">{church.name}</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-600">
+              <h3 className="section-title text-xl text-gray-950">{church.name}</h3>
+              <p className="muted-copy mt-3 text-sm">
                 {church.location}
               </p>
-              <p className="mt-2 text-sm leading-6 text-gray-500">
+              <p className="muted-copy mt-2 text-sm">
                 {church.address || "Próximamente compartiremos la dirección y horarios."}
               </p>
 
@@ -128,7 +130,7 @@ export default function IglesiasPage() {
                 <Link
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(church.address)}`}
                   target="_blank"
-                  className="mt-4 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                  className="mt-4 inline-block font-extrabold text-[var(--ivbcc-navy)]"
                 >
                   Ver en Google Maps
                 </Link>

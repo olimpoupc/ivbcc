@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { buildCourseProgressState } from "@/lib/course-progress";
 
 export default async function MisCursosPage() {
   const supabase = await createSupabaseServerClient();
@@ -11,15 +12,16 @@ export default async function MisCursosPage() {
 
   if (!user) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <section className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-          <h1 className="text-3xl font-bold text-gray-950">Mis cursos</h1>
-          <p className="mt-4 text-sm font-medium text-gray-600">
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Formación</p>
+          <h1 className="section-title mt-3 text-4xl text-gray-950">Mis cursos</h1>
+          <p className="muted-copy mt-4 text-sm">
             Debes iniciar sesión para ver tus cursos
           </p>
           <Link
             href="/login"
-            className="mt-4 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+            className="btn-primary mt-6"
           >
             Ir al login
           </Link>
@@ -42,15 +44,16 @@ export default async function MisCursosPage() {
 
   if (!courseIds.length) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <section className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm">
-          <h1 className="text-3xl font-bold text-gray-950">Mis cursos</h1>
-          <p className="mt-4 text-sm font-medium text-gray-600">
+      <main className="premium-page py-12">
+        <section className="premium-surface site-shell max-w-3xl rounded-[30px] px-6 py-12 text-center">
+          <p className="kicker">Formación</p>
+          <h1 className="section-title mt-3 text-4xl text-gray-950">Mis cursos</h1>
+          <p className="muted-copy mt-4 text-sm">
             Aún no estás inscrito en ningún curso.
           </p>
           <Link
             href="/formacion"
-            className="mt-4 inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+            className="btn-primary mt-6"
           >
             Explorar formación
           </Link>
@@ -78,31 +81,43 @@ export default async function MisCursosPage() {
     return <main className="p-10">Error cargando el progreso.</main>;
   }
 
-  const { data: progress, error: progressError } = await supabase
-    .from("course_progress")
-    .select("course_id,lesson_id,completed")
-    .eq("user_id", user.id)
-    .in("course_id", courseIds)
-    .eq("completed", true);
+  const { data: publishedQuizzes, error: quizzesError } = await supabase
+    .from("quizzes")
+    .select("id,course_id,lesson_id")
+    .eq("status", "published")
+    .in("course_id", courseIds);
 
-  if (progressError) {
-    return <main className="p-10">Error cargando el progreso.</main>;
+  if (quizzesError) {
+    return <main className="p-10">Error cargando quizzes.</main>;
   }
 
-  const lessonsByCourse = new Map<string, number>();
-  const completedByCourse = new Map<string, Set<string>>();
+  const quizIds = (publishedQuizzes || []).map((quiz) => quiz.id);
+  const { data: quizAttempts, error: quizAttemptsError } = quizIds.length
+    ? await supabase
+        .from("quiz_attempts")
+        .select("quiz_id,score,total_questions,created_at")
+        .eq("user_id", user.id)
+        .in("quiz_id", quizIds)
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (quizAttemptsError) {
+    return <main className="p-10">Error cargando intentos de quizzes.</main>;
+  }
+
+  const lessonsByCourse = new Map<string, typeof lessons>();
+  const quizzesByCourse = new Map<string, typeof publishedQuizzes>();
 
   for (const lesson of lessons || []) {
-    lessonsByCourse.set(
-      lesson.course_id,
-      (lessonsByCourse.get(lesson.course_id) || 0) + 1
-    );
+    const current = lessonsByCourse.get(lesson.course_id) || [];
+    current.push(lesson);
+    lessonsByCourse.set(lesson.course_id, current);
   }
 
-  for (const item of progress || []) {
-    const current = completedByCourse.get(item.course_id) || new Set<string>();
-    current.add(item.lesson_id);
-    completedByCourse.set(item.course_id, current);
+  for (const quiz of publishedQuizzes || []) {
+    const current = quizzesByCourse.get(quiz.course_id) || [];
+    current.push(quiz);
+    quizzesByCourse.set(quiz.course_id, current);
   }
 
   const coursesById = new Map((courses || []).map((course) => [course.id, course]));
@@ -111,35 +126,44 @@ export default async function MisCursosPage() {
     .filter(Boolean);
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <header className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-950 md:text-4xl">
+    <main className="premium-page py-12">
+      <div className="site-shell-wide">
+      <header className="page-hero mb-10">
+        <div className="hero-inner p-7 md:p-10">
+        <p className="kicker">Mi formación</p>
+        <h1 className="section-title mt-3 text-4xl md:text-5xl">
           Mis cursos
         </h1>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/72">
           Consulta tus cursos inscritos y revisa cómo va tu avance.
         </p>
+        </div>
       </header>
 
       <section className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {enrolledCourses.map((course) => {
           if (!course) return null;
 
-          const totalLessons = lessonsByCourse.get(course.id) || 0;
-          const completedLessons = completedByCourse.get(course.id)?.size || 0;
-          const progressPercentage =
-            totalLessons > 0
-              ? Math.round((completedLessons / totalLessons) * 100)
-              : 0;
-          const isCompleted = totalLessons > 0 && completedLessons === totalLessons;
+          const progressState = buildCourseProgressState({
+            lessons: (lessonsByCourse.get(course.id) || []).map((lesson) => ({
+              id: lesson.id,
+              order: lesson.order,
+            })),
+            quizzes: (quizzesByCourse.get(course.id) || []).map((quiz) => ({
+              id: quiz.id,
+              lesson_id: quiz.lesson_id,
+            })),
+            attempts: quizAttempts || [],
+            isEnrolled: true,
+          });
 
           return (
             <article
               key={course.id}
-              className="overflow-hidden rounded-2xl bg-white shadow-sm transition hover:shadow-lg"
+              className="editorial-card"
             >
               {course.image_url ? (
-                <div className="relative h-48 w-full bg-gray-100">
+                <div className="media-frame h-48 w-full rounded-none">
                   <Image
                     src={course.image_url}
                     alt={course.title}
@@ -158,37 +182,40 @@ export default async function MisCursosPage() {
 
               <div className="space-y-4 p-6">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-950">
+                  <h2 className="section-title text-2xl text-gray-950">
                     {course.title}
                   </h2>
-                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-600">
+                  <p className="muted-copy mt-2 line-clamp-3 text-sm">
                     {course.description}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Progreso: {progressPercentage}%
+                  <p className="text-sm font-extrabold text-[var(--ivbcc-navy)]">
+                    Progreso: {progressState.progressPercentage}%
                   </p>
-                  <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-[#f3eee4]">
                     <div
                       className="h-full rounded-full bg-[var(--ivbcc-gold)] transition-all"
-                      style={{ width: `${progressPercentage}%` }}
+                      style={{ width: `${progressState.progressPercentage}%` }}
                     />
                   </div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    {progressState.completedLessons} de {progressState.totalLessons} lecciones completadas
+                  </p>
                 </div>
 
                 <p
                   className={`text-sm font-semibold ${
-                    isCompleted ? "text-green-700" : "text-gray-600"
+                    progressState.certificateAvailable ? "text-green-700" : "text-slate-600"
                   }`}
                 >
-                  {isCompleted ? "Curso completado 🎉" : "En progreso"}
+                  {progressState.certificateAvailable ? "Curso completado" : "En progreso"}
                 </p>
 
                 <Link
                   href={`/formacion/${course.slug}`}
-                  className="inline-block font-semibold text-[var(--ivbcc-navy)] hover:underline"
+                  className="btn-ghost"
                 >
                   Ver curso
                 </Link>
@@ -197,6 +224,7 @@ export default async function MisCursosPage() {
           );
         })}
       </section>
+      </div>
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AuthFeedback from "@/components/AuthFeedback";
+import FormField from "@/components/ui/FormField";
 
 function isValidPassword(value: string) {
   return value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value);
@@ -129,36 +130,26 @@ export default function UpdatePasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          Nueva contraseña
-        </label>
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
-          required
-        />
-      </div>
+      <FormField
+        label="Nueva contraseña"
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        required
+      />
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          Confirmar contraseña
-        </label>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(event) => setConfirmPassword(event.target.value)}
-          className="w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
-          required
-        />
-      </div>
+      <FormField
+        label="Confirmar contraseña"
+        type="password"
+        value={confirmPassword}
+        onChange={(event) => setConfirmPassword(event.target.value)}
+        required
+      />
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-lg bg-[var(--ivbcc-navy)] py-2 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+        className="btn-primary w-full disabled:opacity-60"
       >
         {isSubmitting ? "Actualizando..." : "Actualizar contraseña"}
       </button>

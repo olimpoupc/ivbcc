@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AuthFeedback from "@/components/AuthFeedback";
 import { supabase } from "@/lib/supabase";
+import FormField from "@/components/ui/FormField";
 
 type ProfileFormValues = {
   id: string;
@@ -83,15 +84,15 @@ export default function ProfileForm({ initialProfile }: Props) {
   }
 
   return (
-    <article className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+    <article className="premium-surface rounded-[30px] p-6 md:p-8">
       <div className="mb-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+        <p className="kicker">
           Datos personales
         </p>
-        <h2 className="mt-2 text-2xl font-bold text-gray-950">
+        <h2 className="section-title mt-2 text-3xl text-gray-950">
           Actualiza tu perfil
         </h2>
-        <p className="mt-3 text-sm leading-6 text-gray-600">
+        <p className="muted-copy mt-3 text-sm">
           Mantén tus datos al día para una experiencia más clara dentro de la
           plataforma.
         </p>
@@ -101,72 +102,48 @@ export default function ProfileForm({ initialProfile }: Props) {
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Nombres
-            </label>
-            <input
-              type="text"
-              value={values.first_name}
-              onChange={(event) => updateField("first_name", event.target.value)}
-              className="w-full rounded-lg border px-4 py-3"
-            />
-          </div>
+          <FormField
+            label="Nombres"
+            type="text"
+            value={values.first_name}
+            onChange={(event) => updateField("first_name", event.target.value)}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Apellidos
-            </label>
-            <input
-              type="text"
-              value={values.last_name}
-              onChange={(event) => updateField("last_name", event.target.value)}
-              className="w-full rounded-lg border px-4 py-3"
-            />
-          </div>
+          <FormField
+            label="Apellidos"
+            type="text"
+            value={values.last_name}
+            onChange={(event) => updateField("last_name", event.target.value)}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Edad
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={values.age}
-              onChange={(event) => updateField("age", event.target.value)}
-              className="w-full rounded-lg border px-4 py-3"
-            />
-          </div>
+          <FormField
+            label="Edad"
+            type="number"
+            min="0"
+            value={values.age}
+            onChange={(event) => updateField("age", event.target.value)}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              value={values.email}
-              readOnly
-              className="w-full rounded-lg border bg-gray-50 px-4 py-3 text-gray-500"
-            />
-          </div>
+          <FormField
+            label="Correo electrónico"
+            type="email"
+            value={values.email}
+            readOnly
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Rol
-            </label>
-            <input
-              type="text"
-              value={values.role}
-              readOnly
-              className="w-full rounded-lg border bg-gray-50 px-4 py-3 capitalize text-gray-500"
-            />
-          </div>
+          <FormField
+            label="Rol"
+            type="text"
+            value={values.role}
+            readOnly
+            className="capitalize"
+          />
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+          className="btn-primary disabled:opacity-60"
         >
           {isSubmitting ? "Guardando..." : "Guardar cambios"}
         </button>

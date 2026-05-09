@@ -1,37 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  buildCourseProgressState,
+  getApprovedQuizIds,
+} from "@/lib/course-progress";
 import ProfileForm from "./ProfileForm";
-
-function getApprovedQuizIds(
-  attempts: Array<{ quiz_id: string; score: number; total_questions: number }>
-) {
-  const latestAttemptsByQuiz = new Map<
-    string,
-    { score: number; total_questions: number }
-  >();
-
-  for (const attempt of attempts) {
-    if (!latestAttemptsByQuiz.has(attempt.quiz_id)) {
-      latestAttemptsByQuiz.set(attempt.quiz_id, {
-        score: attempt.score,
-        total_questions: attempt.total_questions,
-      });
-    }
-  }
-
-  return new Set(
-    [...latestAttemptsByQuiz.entries()]
-      .filter(([, attempt]) => {
-        const percentage = attempt.total_questions
-          ? Math.round((attempt.score / attempt.total_questions) * 100)
-          : 0;
-
-        return percentage >= 60;
-      })
-      .map(([quizId]) => quizId)
-  );
-}
 
 export default async function PerfilPage() {
   const supabase = await createSupabaseServerClient();
@@ -96,33 +70,25 @@ export default async function PerfilPage() {
 
   const [
     { data: lessons, error: lessonsError },
-    { data: progress, error: progressError },
     { data: publishedQuizzes, error: quizzesError },
   ] = courseIds.length
     ? await Promise.all([
         supabase
           .from("lessons")
-          .select("id,course_id")
+          .select('id,course_id,"order"')
           .in("course_id", courseIds),
         supabase
-          .from("course_progress")
-          .select("course_id,lesson_id,completed")
-          .eq("user_id", user.id)
-          .in("course_id", courseIds)
-          .eq("completed", true),
-        supabase
           .from("quizzes")
-          .select("id,course_id")
+          .select("id,course_id,lesson_id")
           .in("course_id", courseIds)
           .eq("status", "published"),
       ])
     : [
         { data: [], error: null },
         { data: [], error: null },
-        { data: [], error: null },
       ];
 
-  if (lessonsError || progressError || quizzesError) {
+  if (lessonsError || quizzesError) {
     return <main className="p-10">Error cargando tu progreso.</main>;
   }
 
@@ -143,26 +109,18 @@ export default async function PerfilPage() {
     return <main className="p-10">Error cargando tus quizzes.</main>;
   }
 
-  const lessonsByCourse = new Map<string, Set<string>>();
-  const completedLessonsByCourse = new Map<string, Set<string>>();
-  const quizzesByCourse = new Map<string, Set<string>>();
+  const lessonsByCourse = new Map<string, typeof lessons>();
+  const quizzesByCourse = new Map<string, typeof publishedQuizzes>();
 
   for (const lesson of lessons || []) {
-    const current = lessonsByCourse.get(lesson.course_id) || new Set<string>();
-    current.add(lesson.id);
+    const current = lessonsByCourse.get(lesson.course_id) || [];
+    current.push(lesson);
     lessonsByCourse.set(lesson.course_id, current);
   }
 
-  for (const item of progress || []) {
-    const current =
-      completedLessonsByCourse.get(item.course_id) || new Set<string>();
-    current.add(item.lesson_id);
-    completedLessonsByCourse.set(item.course_id, current);
-  }
-
   for (const quiz of publishedQuizzes || []) {
-    const current = quizzesByCourse.get(quiz.course_id) || new Set<string>();
-    current.add(quiz.id);
+    const current = quizzesByCourse.get(quiz.course_id) || [];
+    current.push(quiz);
     quizzesByCourse.set(quiz.course_id, current);
   }
 
@@ -171,34 +129,40 @@ export default async function PerfilPage() {
   let completedCoursesCount = 0;
 
   for (const courseId of courseIds) {
-    const totalLessons = lessonsByCourse.get(courseId)?.size || 0;
-    const completedLessons =
-      completedLessonsByCourse.get(courseId)?.size || 0;
-    const courseQuizIds = quizzesByCourse.get(courseId) || new Set<string>();
-    const allCourseQuizzesApproved = [...courseQuizIds].every((quizId) =>
-      approvedQuizIds.has(quizId)
-    );
-    const allLessonsCompleted =
-      totalLessons > 0 && completedLessons === totalLessons;
+    const progressState = buildCourseProgressState({
+      lessons: (lessonsByCourse.get(courseId) || []).map((lesson) => ({
+        id: lesson.id,
+        order: lesson.order,
+      })),
+      quizzes: (quizzesByCourse.get(courseId) || []).map((quiz) => ({
+        id: quiz.id,
+        lesson_id: quiz.lesson_id,
+      })),
+      attempts: quizAttempts || [],
+      isEnrolled: true,
+    });
 
-    if (allLessonsCompleted && allCourseQuizzesApproved) {
+    if (progressState.certificateAvailable) {
       completedCoursesCount += 1;
     }
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
-      <header className="mb-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+    <main className="premium-page py-12">
+      <div className="site-shell-wide">
+      <header className="page-hero mb-10">
+        <div className="hero-inner p-7 md:p-10">
+        <p className="kicker">
           Mi cuenta
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-gray-950 md:text-4xl">
+        <h1 className="section-title mt-3 text-4xl md:text-5xl">
           Perfil de usuario
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/72">
           Administra tus datos personales, consulta tu avance y mantén segura tu
           cuenta.
         </p>
+        </div>
       </header>
 
       <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -214,57 +178,57 @@ export default async function PerfilPage() {
         />
 
         <div className="space-y-6">
-          <article className="rounded-2xl bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <article className="premium-surface rounded-[30px] p-6">
+            <p className="kicker">
               Seguridad
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-gray-950">
+            <h2 className="section-title mt-2 text-3xl text-gray-950">
               Cambia tu contraseña
             </h2>
-            <p className="mt-3 text-sm leading-6 text-gray-600">
+            <p className="muted-copy mt-3 text-sm">
               Si necesitas actualizar tu contraseña, puedes iniciar el proceso de
               recuperación de forma segura.
             </p>
             <Link
               href="/recuperar-password"
-              className="mt-5 inline-flex rounded-lg bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+              className="btn-secondary mt-5"
             >
               Cambiar contraseña
             </Link>
           </article>
 
-          <article className="rounded-2xl bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--ivbcc-gold)]">
+          <article className="premium-surface rounded-[30px] p-6">
+            <p className="kicker">
               Progreso
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-gray-950">
+            <h2 className="section-title mt-2 text-3xl text-gray-950">
               Resumen de formación
             </h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-3xl font-bold text-gray-950">
+              <div className="rounded-2xl bg-[#f6f1e8] p-4">
+                <p className="font-display text-3xl font-extrabold text-[var(--ivbcc-navy)]">
                   {enrolledCoursesCount}
                 </p>
-                <p className="mt-2 text-sm font-medium text-gray-500">
+                <p className="mt-2 text-sm font-bold text-slate-500">
                   Cursos inscritos
                 </p>
               </div>
 
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-3xl font-bold text-gray-950">
+              <div className="rounded-2xl bg-[#f6f1e8] p-4">
+                <p className="font-display text-3xl font-extrabold text-[var(--ivbcc-navy)]">
                   {completedCoursesCount}
                 </p>
-                <p className="mt-2 text-sm font-medium text-gray-500">
+                <p className="mt-2 text-sm font-bold text-slate-500">
                   Cursos completados
                 </p>
               </div>
 
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-3xl font-bold text-gray-950">
+              <div className="rounded-2xl bg-[#f6f1e8] p-4">
+                <p className="font-display text-3xl font-extrabold text-[var(--ivbcc-navy)]">
                   {approvedQuizIds.size}
                 </p>
-                <p className="mt-2 text-sm font-medium text-gray-500">
+                <p className="mt-2 text-sm font-bold text-slate-500">
                   Quizzes aprobados
                 </p>
               </div>
@@ -272,13 +236,14 @@ export default async function PerfilPage() {
 
             <Link
               href="/mis-cursos"
-              className="mt-6 inline-flex rounded-lg border border-[var(--ivbcc-navy)] px-5 py-3 text-sm font-bold text-[var(--ivbcc-navy)] transition hover:bg-[var(--ivbcc-navy)] hover:text-white"
+              className="btn-ghost mt-6"
             >
               Ir a Mis Cursos
             </Link>
           </article>
         </div>
       </section>
+      </div>
     </main>
   );
 }

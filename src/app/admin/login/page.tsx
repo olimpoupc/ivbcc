@@ -1,19 +1,16 @@
+import AuthShell from "@/components/ui/AuthShell";
 import AdminLoginForm from "./AdminLoginForm";
 
 export default function AdminLoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-100 px-6">
-      <section className="w-full max-w-md bg-white rounded-xl shadow-md p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">
-          Panel Administrativo
-        </h1>
-
-        <p className="text-center text-gray-600 mb-6">
-          Iglesia Valle de Bendición Cruzada Cristiana
-        </p>
-
-        <AdminLoginForm />
-      </section>
-    </main>
+    <AuthShell
+      eyebrow="Administración"
+      title="Panel administrativo"
+      description="Acceso privado para gestionar contenido, comunidad y configuración de IVBCC."
+      panelTitle="Gestión IVBCC"
+      panelCopy="Un entorno privado para mantener noticias, eventos, formación, transmisiones y mensajes al día."
+    >
+      <AdminLoginForm />
+    </AuthShell>
   );
 }
