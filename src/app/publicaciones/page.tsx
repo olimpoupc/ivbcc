@@ -1,14 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
+import InlineVideoPreview, {
+  InlineVideoOpenButton,
+} from "@/components/publications/InlineVideoPreview";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export const revalidate = 300;
-
-const VideoPreviewModal = dynamic(
-  () => import("@/components/publications/VideoPreviewModal")
-);
 
 type PublicationCategory =
   | "devotional"
@@ -189,8 +187,17 @@ export default async function PublicacionesPage({ searchParams }: { searchParams
 
       {leadPublication ? (
         <section className="site-shell-wide pb-12">
-          <article className="editorial-card grid lg:grid-cols-[1.05fr_0.95fr]">
-            <PublicationMedia publication={leadPublication} priority large />
+          <article
+            className={`editorial-card grid lg:grid-cols-[1.05fr_0.95fr] ${
+              isVideoPublication(leadPublication) ? "has-video-embed" : ""
+            }`}
+          >
+            <PublicationMedia
+              publication={leadPublication}
+              priority
+              large
+              videoPlayerId={`lead-${leadPublication.id}`}
+            />
             <div className="flex flex-col justify-center p-7 md:p-10">
               <div className="flex flex-wrap gap-2">
                 {getPublicationBadges(leadPublication).map((badge) => (
@@ -208,7 +215,10 @@ export default async function PublicacionesPage({ searchParams }: { searchParams
               <p className="muted-copy mt-5 line-clamp-5">
                 {leadPublication.summary || "Sin resumen disponible."}
               </p>
-              <PublicationActions publication={leadPublication} />
+              <PublicationActions
+                publication={leadPublication}
+                videoPlayerId={`lead-${leadPublication.id}`}
+              />
             </div>
           </article>
         </section>
@@ -226,30 +236,46 @@ export default async function PublicacionesPage({ searchParams }: { searchParams
 
         {gridPublications.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {gridPublications.map((publication) => (
-              <article key={publication.id} className="editorial-card">
-                <PublicationMedia publication={publication} />
-                <div className="flex min-h-[260px] flex-col p-6">
-                  <div className="flex flex-wrap gap-2">
-                    {getPublicationBadges(publication).map((badge) => (
-                      <span key={badge} className="badge">
-                        {badge}
-                      </span>
-                    ))}
+            {gridPublications.map((publication) => {
+              const videoPlayerId = `grid-${publication.id}`;
+
+              return (
+                <article
+                  key={publication.id}
+                  className={`editorial-card ${
+                    isVideoPublication(publication) ? "has-video-embed" : ""
+                  }`}
+                >
+                  <PublicationMedia
+                    publication={publication}
+                    videoPlayerId={videoPlayerId}
+                  />
+                  <div className="flex min-h-[260px] flex-col p-6">
+                    <div className="flex flex-wrap gap-2">
+                      {getPublicationBadges(publication).map((badge) => (
+                        <span key={badge} className="badge">
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-sm font-semibold text-slate-500">
+                      {formatDateColombia(publication.published_at || publication.created_at)}
+                    </p>
+                    <h3 className="section-title mt-2 text-2xl">{publication.title}</h3>
+                    <p className="muted-copy mt-3 line-clamp-3 text-sm">
+                      {publication.summary || "Sin resumen disponible."}
+                    </p>
+                    <div className="mt-auto pt-5">
+                      <PublicationActions
+                        publication={publication}
+                        compact
+                        videoPlayerId={videoPlayerId}
+                      />
+                    </div>
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-slate-500">
-                    {formatDateColombia(publication.published_at || publication.created_at)}
-                  </p>
-                  <h3 className="section-title mt-2 text-2xl">{publication.title}</h3>
-                  <p className="muted-copy mt-3 line-clamp-3 text-sm">
-                    {publication.summary || "Sin resumen disponible."}
-                  </p>
-                  <div className="mt-auto pt-5">
-                    <PublicationActions publication={publication} compact />
-                  </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="premium-surface rounded-[28px] px-6 py-16 text-center text-sm text-slate-500">
@@ -265,8 +291,10 @@ function PublicationMedia({
   publication,
   priority = false,
   large = false,
+  videoPlayerId,
 }: {
   publication: {
+    id: string;
     title: string;
     image_url: string | null;
     video_url: string | null;
@@ -274,44 +302,52 @@ function PublicationMedia({
   };
   priority?: boolean;
   large?: boolean;
+  videoPlayerId: string;
 }) {
   const videoEmbedUrl = getYouTubeEmbedUrl(publication.video_url);
   const isVideo = isVideoPublication(publication);
 
+  const mediaContent = publication.image_url ? (
+    <Image
+      src={publication.image_url}
+      alt={publication.title}
+      fill
+      sizes={large ? "(min-width: 1024px) 620px, 100vw" : "(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"}
+      priority={priority}
+      className="object-cover"
+    />
+  ) : (
+    <EmptyImagePlaceholder
+      label="IVBCC Publicaciones"
+      subtitle="Recursos, reflexiones y contenido ministerial."
+      className="h-full"
+      variant={large ? "detail" : "card"}
+    />
+  );
+
   return (
     <div className={`media-frame rounded-none ${large ? "min-h-[440px]" : "aspect-[16/10]"}`}>
-      {publication.image_url ? (
-        <Image
-          src={publication.image_url}
-          alt={publication.title}
-          fill
-          sizes={large ? "(min-width: 1024px) 620px, 100vw" : "(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"}
-          priority={priority}
-          className="object-cover"
-        />
+      {isVideo && videoEmbedUrl ? (
+        <InlineVideoPreview
+          playerId={videoPlayerId}
+          title={publication.title}
+          embedUrl={videoEmbedUrl}
+          triggerLabel="Ver video"
+          triggerAriaLabel={`Ver video: ${publication.title}`}
+          triggerClassName="absolute inset-0 flex items-center justify-center bg-slate-950/28 text-sm font-extrabold uppercase tracking-[0.18em] text-white transition hover:bg-slate-950/38"
+        >
+          {mediaContent}
+        </InlineVideoPreview>
       ) : (
-        <EmptyImagePlaceholder
-          label="IVBCC Publicaciones"
-          subtitle="Recursos, reflexiones y contenido ministerial."
-          className="h-full"
-          variant={large ? "detail" : "card"}
-        />
+        <>
+          {mediaContent}
+          {isVideo ? (
+            <span className="absolute inset-0 flex items-center justify-center bg-slate-950/28 text-sm font-extrabold uppercase tracking-[0.18em] text-white">
+              Video
+            </span>
+          ) : null}
+        </>
       )}
-      {isVideo ? (
-        videoEmbedUrl ? (
-          <VideoPreviewModal
-            title={publication.title}
-            embedUrl={videoEmbedUrl}
-            triggerLabel="Ver video"
-            triggerAriaLabel={`Ver video: ${publication.title}`}
-            triggerClassName="absolute inset-0 flex items-center justify-center bg-slate-950/28 text-sm font-extrabold uppercase tracking-[0.18em] text-white transition hover:bg-slate-950/38"
-          />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center bg-slate-950/28 text-sm font-extrabold uppercase tracking-[0.18em] text-white">
-            Video
-          </span>
-        )
-      ) : null}
     </div>
   );
 }
@@ -319,6 +355,7 @@ function PublicationMedia({
 function PublicationActions({
   publication,
   compact = false,
+  videoPlayerId,
 }: {
   publication: {
     slug: string;
@@ -327,6 +364,7 @@ function PublicationActions({
     category: string;
   };
   compact?: boolean;
+  videoPlayerId: string;
 }) {
   const videoEmbedUrl = getYouTubeEmbedUrl(publication.video_url);
   const isVideo = isVideoPublication(publication);
@@ -334,9 +372,9 @@ function PublicationActions({
   return (
     <div className="mt-6 flex flex-wrap gap-3">
       {videoEmbedUrl ? (
-        <VideoPreviewModal
+        <InlineVideoOpenButton
+          playerId={videoPlayerId}
           title={publication.title}
-          embedUrl={videoEmbedUrl}
           triggerLabel="Ver video"
           triggerClassName={compact ? "btn-primary" : "btn-primary"}
         />

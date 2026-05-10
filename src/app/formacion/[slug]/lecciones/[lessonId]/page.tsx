@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import {
   QUIZ_PASSING_PERCENTAGE,
   buildCourseProgressState,
@@ -238,16 +239,7 @@ export default async function LeccionDetallePage({ params }: Props) {
 
         {videoEmbedUrl && (
           <div className="mb-8 overflow-hidden rounded-[30px] bg-black shadow-xl">
-            <div className="relative aspect-video w-full">
-              <iframe
-                src={videoEmbedUrl}
-                title={lesson.title}
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full"
-              />
-            </div>
+            <YouTubeEmbed src={videoEmbedUrl} title={lesson.title} />
           </div>
         )}
 

@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildContentMetadata, resolveSeoDescription, seoConfig } from "@/lib/seo";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import TrackedNextLink from "@/components/analytics/TrackedNextLink";
+import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import ShareLiveStreamButtons from "./ShareLiveStreamButtons";
 
 export const revalidate = 300;
@@ -176,16 +177,7 @@ export default async function EnVivoDetallePage({ params }: Props) {
         <section className="space-y-8">
           {videoEmbedUrl ? (
             <section className="overflow-hidden rounded-[30px] bg-slate-950 shadow-lg">
-              <div className="relative aspect-video w-full">
-                <iframe
-                  src={videoEmbedUrl}
-                  title={stream.title}
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="absolute inset-0 h-full w-full"
-                />
-              </div>
+              <YouTubeEmbed src={videoEmbedUrl} title={stream.title} />
               <div className="flex flex-col gap-3 border-t border-white/10 px-6 py-4 text-white md:flex-row md:items-center md:justify-between md:px-8">
                 <p className="text-sm leading-6 text-white/78">
                   Si el video no se reproduce aquí, puedes verlo directamente en YouTube.

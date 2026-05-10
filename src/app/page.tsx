@@ -6,6 +6,7 @@ import TrackedNextLink from "@/components/analytics/TrackedNextLink";
 import HomeContentCarousel, {
   type HomeContentCarouselItem,
 } from "@/components/home/HomeContentCarousel";
+import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getPublicSiteSettings } from "@/lib/site-settings";
 
@@ -380,16 +381,7 @@ export default async function Home() {
               {currentLiveStream ? (
                 currentLiveEmbedUrl ? (
                   <div className="bg-slate-950">
-                    <div className="relative aspect-video">
-                      <iframe
-                        src={currentLiveEmbedUrl}
-                        title={currentLiveStream.title}
-                        loading="lazy"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="absolute inset-0 h-full w-full"
-                      />
-                    </div>
+                    <YouTubeEmbed src={currentLiveEmbedUrl} title={currentLiveStream.title} />
                   </div>
                 ) : currentLiveStream.thumbnail_url ? (
                   <div className="relative aspect-[16/10]">

@@ -7,6 +7,7 @@ import {
   seoConfig,
 } from "@/lib/seo";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import SharePublicationButtons from "./SharePublicationButtons";
 
 export const revalidate = 300;
@@ -260,23 +261,14 @@ export default async function PublicacionDetallePage({ params }: Props) {
           )}
 
           {(videoEmbedUrl || publication.file_url) && (
-            <section className="premium-surface rounded-[30px] p-8">
+            <section className="premium-surface video-resource-surface rounded-[30px] p-8">
               <p className="kicker">
                 Recursos
               </p>
 
               {videoEmbedUrl && (
                 <div className="mt-5 overflow-hidden rounded-[24px] bg-slate-950 shadow-lg">
-                  <div className="relative aspect-video w-full">
-                    <iframe
-                      src={videoEmbedUrl}
-                      title={publication.title}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="absolute inset-0 h-full w-full"
-                    />
-                  </div>
+                  <YouTubeEmbed src={videoEmbedUrl} title={publication.title} />
                 </div>
               )}
 

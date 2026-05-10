@@ -3,6 +3,7 @@ import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import TrackedNextLink from "@/components/analytics/TrackedNextLink";
+import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import { getPublicSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -149,19 +150,10 @@ export default async function EnVivoPage({ searchParams }: { searchParams: Searc
             <p className="kicker text-red-600">Ahora mismo</p>
             <h2 className="section-title mt-2 text-4xl">Transmisión actual</h2>
           </div>
-          <article className="editorial-card">
+          <article className="editorial-card has-video-embed">
             {currentLiveEmbedUrl ? (
               <div className="bg-slate-950">
-                <div className="relative aspect-video w-full">
-                  <iframe
-                    src={currentLiveEmbedUrl}
-                    title={currentLiveStream.title}
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="absolute inset-0 h-full w-full"
-                  />
-                </div>
+                <YouTubeEmbed src={currentLiveEmbedUrl} title={currentLiveStream.title} />
               </div>
             ) : currentLiveStream.thumbnail_url ? (
               <div className="media-frame aspect-video rounded-none">
