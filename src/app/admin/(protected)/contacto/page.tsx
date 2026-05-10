@@ -14,9 +14,8 @@ function formatDateColombia(value?: string | null) {
 export default async function AdminContactoPage() {
   const supabase = await createSupabaseServerClient();
 
-  const [{ count: totalMessages }, { data: messages, error }] =
+  const [{ data: messages, error }] =
     await Promise.all([
-      supabase.from("contact_messages").select("*", { count: "exact", head: true }),
       supabase
         .from("contact_messages")
         .select("*")
@@ -26,20 +25,6 @@ export default async function AdminContactoPage() {
   if (error) {
     return <main className="p-8 text-sm text-gray-500">Error cargando mensajes.</main>;
   }
-
-  const metrics = [
-    { label: "Mensajes recibidos", value: totalMessages || 0 },
-    {
-      label: "Pendientes",
-      value: (messages || []).filter((message) => message.status === "pending")
-        .length,
-    },
-    {
-      label: "Respondidos",
-      value: (messages || []).filter((message) => message.status === "responded")
-        .length,
-    },
-  ];
 
   const rows = (messages || []).map((message) => ({
     id: message.id,
@@ -53,29 +38,26 @@ export default async function AdminContactoPage() {
     status: message.status,
     admin_response: message.admin_response || "",
     responded_at: message.responded_at,
+    updated_at: message.updated_at,
     created_at: message.created_at,
     created_at_label: formatDateColombia(message.created_at),
     responded_at_label: formatDateColombia(message.responded_at),
+    updated_at_label: formatDateColombia(message.updated_at),
   }));
 
   return (
     <main className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-950">Contacto</h1>
-        <p className="mt-2 text-gray-600">
-          Gestiona mensajes recibidos desde la página pública de contacto de
-          IVBCC.
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
+          Bandeja administrativa
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-gray-950">Contacto</h1>
+        <p className="mt-2 max-w-3xl text-gray-600">
+          Gestiona mensajes recibidos desde la página pública de contacto,
+          revisa su estado y responde por correo o WhatsApp usando enlaces
+          rápidos del navegador.
         </p>
       </div>
-
-      <section className="grid gap-6 md:grid-cols-3">
-        {metrics.map((metric) => (
-          <article key={metric.label} className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-3xl font-bold text-gray-950">{metric.value}</p>
-            <p className="mt-2 text-sm font-medium text-gray-500">{metric.label}</p>
-          </article>
-        ))}
-      </section>
 
       <ContactMessagesPanel initialMessages={rows} />
     </main>

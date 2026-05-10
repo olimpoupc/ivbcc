@@ -26,34 +26,37 @@ type ContactMessageRow = {
   status: MessageStatus;
   admin_response: string;
   responded_at?: string | null;
+  updated_at?: string | null;
   created_at?: string | null;
   created_at_label: string;
   responded_at_label: string;
+  updated_at_label: string;
 };
 
 type Props = {
   initialMessages: ContactMessageRow[];
 };
 
-const statusConfig: Record<
-  MessageStatus,
-  { label: string; className: string }
-> = {
+const statusConfig: Record<MessageStatus, { label: string; className: string; dot: string }> = {
   pending: {
     label: "Pendiente",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+    dot: "bg-amber-500",
   },
   read: {
     label: "Leído",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+    dot: "bg-blue-500",
   },
   responded: {
     label: "Respondido",
-    className: "bg-green-50 text-green-700 border-green-200",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    dot: "bg-emerald-500",
   },
   archived: {
     label: "Archivado",
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "border-slate-200 bg-slate-100 text-slate-700",
+    dot: "bg-slate-400",
   },
 };
 
@@ -66,6 +69,10 @@ const categoryConfig: Record<MessageCategory, string> = {
   support: "Soporte",
   other: "Otro",
 };
+
+function getStatusConfig(status: MessageStatus) {
+  return statusConfig[status] || statusConfig.pending;
+}
 
 function escapeCsvValue(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
@@ -81,17 +88,47 @@ function formatDateColombia(value?: string | null) {
   }).format(new Date(value));
 }
 
+function buildMailtoHref(message: ContactMessageRow) {
+  const subject = `Respuesta IVBCC - ${message.subject}`;
+  const body = `Hola ${message.full_name},
+
+Bendiciones. Gracias por comunicarte con la Iglesia Valle de Bendición Cruzada Cristiana.
+
+[aquí escribe tu respuesta]
+
+Atentamente,
+Iglesia Valle de Bendición Cruzada Cristiana`;
+
+  return `mailto:${encodeURIComponent(message.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function normalizeColombianPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.startsWith("57") && digits.length >= 12) return digits;
+  if (digits.startsWith("3") && digits.length === 10) return `57${digits}`;
+
+  return digits;
+}
+
+function buildWhatsAppHref(message: ContactMessageRow) {
+  const phone = normalizeColombianPhone(message.phone);
+  const text = `Hola ${message.full_name}, bendiciones. Te saludamos de la Iglesia Valle de Bendición Cruzada Cristiana. Recibimos tu mensaje sobre "${message.subject}".`;
+
+  return phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+    : null;
+}
+
 export default function ContactMessagesPanel({ initialMessages }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | MessageStatus>("all");
-  const [categoryFilter, setCategoryFilter] = useState<
-    "all" | MessageCategory
-  >("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | MessageCategory>("all");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     initialMessages[0]?.id || null
   );
-  const [responseDraft, setResponseDraft] = useState<{
+  const [noteDraft, setNoteDraft] = useState<{
     messageId: string | null;
     value: string;
   }>({
@@ -102,14 +139,34 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     type: "success" | "error" | "info";
     message: string;
   }>({ type: "info", message: "" });
+  const [copyFeedback, setCopyFeedback] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const normalizedQuery = query.trim().toLowerCase();
 
+  const metrics = useMemo(() => {
+    const countByStatus = (status: MessageStatus) =>
+      messages.filter((message) => message.status === status).length;
+
+    return [
+      { label: "Total mensajes", value: messages.length },
+      { label: "Pendientes", value: countByStatus("pending") },
+      { label: "Leídos", value: countByStatus("read") },
+      { label: "Archivados", value: countByStatus("archived") },
+      { label: "Respondidos", value: countByStatus("responded") },
+    ];
+  }, [messages]);
+
   const filteredMessages = useMemo(() => {
     return messages.filter((message) => {
       const matchesQuery = normalizedQuery
-        ? [message.full_name, message.email, message.subject]
+        ? [
+            message.full_name,
+            message.email,
+            message.phone,
+            message.subject,
+            message.message,
+          ]
             .join(" ")
             .toLowerCase()
             .includes(normalizedQuery)
@@ -132,10 +189,16 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     filteredMessages.find((message) => message.id === activeSelectedMessageId) ||
     null;
 
-  const activeResponseDraft =
-    responseDraft.messageId === selectedMessage?.id
-      ? responseDraft.value
+  const activeNoteDraft =
+    noteDraft.messageId === selectedMessage?.id
+      ? noteDraft.value
       : selectedMessage?.admin_response || "";
+
+  const selectedStatus = selectedMessage
+    ? getStatusConfig(selectedMessage.status)
+    : null;
+  const whatsappHref = selectedMessage ? buildWhatsAppHref(selectedMessage) : null;
+  const mailtoHref = selectedMessage ? buildMailtoHref(selectedMessage) : "#";
 
   async function updateMessage(
     id: string,
@@ -178,19 +241,17 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
       status: data.status,
       admin_response: data.admin_response || "",
       responded_at: data.responded_at,
+      updated_at: data.updated_at,
       created_at: data.created_at,
       created_at_label: formatDateColombia(data.created_at),
       responded_at_label: formatDateColombia(data.responded_at),
+      updated_at_label: formatDateColombia(data.updated_at),
     };
 
     setMessages((current) =>
       current.map((message) => (message.id === id ? nextMessage : message))
     );
-
-    setFeedback({
-      type: "success",
-      message: "Cambios guardados correctamente.",
-    });
+    setFeedback({ type: "success", message: "Cambios guardados correctamente." });
 
     return nextMessage;
   }
@@ -198,34 +259,33 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   async function handleStatusChange(status: MessageStatus) {
     if (!selectedMessage) return;
 
-    const respondedAt =
-      status === "responded"
-        ? new Date().toISOString()
-        : status === "archived" || status === "read" || status === "pending"
-          ? selectedMessage.responded_at || null
-          : null;
-
     await updateMessage(selectedMessage.id, {
       status,
-      responded_at: respondedAt,
+      responded_at:
+        status === "responded"
+          ? new Date().toISOString()
+          : selectedMessage.responded_at || null,
     });
   }
 
-  async function handleSaveResponse() {
+  async function handleSaveNote() {
     if (!selectedMessage) return;
 
-    const nextResponse = activeResponseDraft.trim();
-
-    await updateMessage(selectedMessage.id, {
-      admin_response: nextResponse,
-      status: "responded",
-      responded_at: new Date().toISOString(),
+    const nextNote = activeNoteDraft.trim();
+    const updatedMessage = await updateMessage(selectedMessage.id, {
+      admin_response: nextNote,
     });
 
-    setResponseDraft({
-      messageId: selectedMessage.id,
-      value: nextResponse,
-    });
+    if (updatedMessage) {
+      setNoteDraft({
+        messageId: updatedMessage.id,
+        value: updatedMessage.admin_response,
+      });
+      setFeedback({
+        type: "success",
+        message: "Nota interna guardada. No se envió ningún correo.",
+      });
+    }
   }
 
   async function handleDelete() {
@@ -256,10 +316,24 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     setMessages((current) =>
       current.filter((message) => message.id !== selectedMessage.id)
     );
-    setFeedback({
-      type: "success",
-      message: "Mensaje eliminado correctamente.",
-    });
+    setSelectedMessageId(null);
+    setFeedback({ type: "success", message: "Mensaje eliminado correctamente." });
+  }
+
+  async function copyToClipboard(value: string, label: string) {
+    if (!value) return;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyFeedback(`${label} copiado`);
+      setFeedback({ type: "success", message: `${label} copiado al portapapeles.` });
+    } catch {
+      setCopyFeedback("");
+      setFeedback({
+        type: "error",
+        message: `No pudimos copiar ${label.toLowerCase()}.`,
+      });
+    }
   }
 
   function handleExportCsv() {
@@ -271,7 +345,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
         message.phone || "",
         categoryConfig[message.category] || "Otro",
         message.subject,
-        statusConfig[message.status]?.label || "Pendiente",
+        getStatusConfig(message.status).label,
         message.created_at_label,
       ]
         .map((value) => escapeCsvValue(value))
@@ -293,32 +367,41 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-xl bg-white p-6 shadow-sm">
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Buscar mensajes
-            </label>
+    <div className="space-y-6">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {metrics.map((metric) => (
+          <article key={metric.label} className="rounded-2xl bg-white p-5 shadow-sm">
+            <p className="text-3xl font-bold text-gray-950">{metric.value}</p>
+            <p className="mt-2 text-sm font-medium text-gray-500">{metric.label}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.7fr_0.8fr_auto]">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700">
+              Buscar
+            </span>
             <input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Busca por nombre, correo o asunto"
-              className="w-full rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+              placeholder="Nombre, correo, teléfono, asunto o mensaje"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700">
               Estado
-            </label>
+            </span>
             <select
               value={statusFilter}
               onChange={(event) =>
                 setStatusFilter(event.target.value as "all" | MessageStatus)
               }
-              className="w-full rounded-lg border px-4 py-2 text-sm"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
             >
               <option value="all">Todos</option>
               <option value="pending">Pendiente</option>
@@ -326,18 +409,18 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               <option value="responded">Respondido</option>
               <option value="archived">Archivado</option>
             </select>
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700">
               Categoría
-            </label>
+            </span>
             <select
               value={categoryFilter}
               onChange={(event) =>
                 setCategoryFilter(event.target.value as "all" | MessageCategory)
               }
-              className="w-full rounded-lg border px-4 py-2 text-sm"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
             >
               <option value="all">Todas</option>
               {Object.entries(categoryConfig).map(([value, label]) => (
@@ -346,13 +429,13 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
           <div className="flex items-end">
             <button
               type="button"
               onClick={handleExportCsv}
-              className="rounded-lg bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              className="w-full rounded-xl bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
             >
               Exportar CSV
             </button>
@@ -362,149 +445,227 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
       <AuthFeedback type={feedback.type} message={feedback.message} />
 
-      <section className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="mb-5">
-            <h2 className="text-xl font-bold text-gray-950">Mensajes recibidos</h2>
+      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
+        <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <div className="border-b border-gray-100 p-5">
+            <h2 className="text-xl font-bold text-gray-950">Mensajes</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Revisa, clasifica y responde los mensajes enviados desde la página de
-              contacto.
+              {filteredMessages.length} mensaje(s) según los filtros actuales.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
-              <thead>
+            <table className="min-w-[980px] divide-y divide-gray-100 text-sm">
+              <thead className="bg-slate-50">
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="pb-3 pr-4">Nombre</th>
-                  <th className="pb-3 pr-4">Correo</th>
-                  <th className="pb-3 pr-4">Teléfono</th>
-                  <th className="pb-3 pr-4">Categoría</th>
-                  <th className="pb-3 pr-4">Asunto</th>
-                  <th className="pb-3 pr-4">Estado</th>
-                  <th className="pb-3">Fecha</th>
+                  <th className="px-5 py-3">Contacto</th>
+                  <th className="px-5 py-3">Teléfono</th>
+                  <th className="px-5 py-3">Categoría</th>
+                  <th className="px-5 py-3">Asunto</th>
+                  <th className="px-5 py-3">Estado</th>
+                  <th className="px-5 py-3">Fecha</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredMessages.map((message) => (
-                  <tr
-                    key={message.id}
-                    className={`cursor-pointer align-top text-gray-700 transition hover:bg-slate-50 ${
-                      message.id === activeSelectedMessageId ? "bg-slate-50" : ""
-                    }`}
-                    onClick={() => setSelectedMessageId(message.id)}
-                  >
-                    <td className="py-4 pr-4 font-medium">{message.full_name}</td>
-                    <td className="py-4 pr-4">{message.email}</td>
-                    <td className="py-4 pr-4">
-                      {message.phone || "Sin teléfono"}
-                    </td>
-                    <td className="py-4 pr-4">
-                      {categoryConfig[message.category] || "Otro"}
-                    </td>
-                    <td className="py-4 pr-4">{message.subject}</td>
-                    <td className="py-4 pr-4">
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusConfig[message.status].className}`}
-                      >
-                        {statusConfig[message.status].label}
-                      </span>
-                    </td>
-                    <td className="py-4">{message.created_at_label}</td>
-                  </tr>
-                ))}
+                {filteredMessages.map((message) => {
+                  const status = getStatusConfig(message.status);
+                  const isSelected = message.id === activeSelectedMessageId;
+
+                  return (
+                    <tr
+                      key={message.id}
+                      className={`cursor-pointer align-top transition hover:bg-slate-50 ${
+                        isSelected ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedMessageId(message.id);
+                        setNoteDraft({
+                          messageId: message.id,
+                          value: message.admin_response,
+                        });
+                      }}
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                              message.status === "pending"
+                                ? "bg-amber-500"
+                                : "bg-transparent"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <p className="font-semibold text-gray-950">
+                              {message.full_name}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {message.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-gray-600">
+                        {message.phone || "Sin teléfono"}
+                      </td>
+                      <td className="px-5 py-4 text-gray-600">
+                        {categoryConfig[message.category] || "Otro"}
+                      </td>
+                      <td className="px-5 py-4 font-medium text-gray-800">
+                        {message.subject}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${status.className}`}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-gray-500">
+                        {message.created_at_label}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {filteredMessages.length === 0 && (
-            <p className="pt-6 text-center text-sm text-gray-500">
+            <p className="px-6 py-12 text-center text-sm text-gray-500">
               No se encontraron mensajes con ese criterio.
             </p>
           )}
         </article>
 
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          {selectedMessage ? (
+        <aside className="rounded-2xl bg-white p-6 shadow-sm">
+          {selectedMessage && selectedStatus ? (
             <div className="space-y-6">
-              <div>
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-4 border-b border-gray-100 pb-5">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusConfig[selectedMessage.status].className}`}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${selectedStatus.className}`}
                   >
-                    {statusConfig[selectedMessage.status].label}
+                    <span className={`h-2 w-2 rounded-full ${selectedStatus.dot}`} />
+                    {selectedStatus.label}
                   </span>
                   <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
                     {categoryConfig[selectedMessage.category] || "Otro"}
                   </span>
                 </div>
 
-                <h2 className="mt-4 text-2xl font-bold text-gray-950">
-                  {selectedMessage.subject}
-                </h2>
-                <p className="mt-2 text-sm text-gray-500">
-                  Recibido el {selectedMessage.created_at_label}
-                </p>
+                <div>
+                  <h2 className="text-2xl font-bold leading-tight text-gray-950">
+                    {selectedMessage.subject}
+                  </h2>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Recibido el {selectedMessage.created_at_label}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Nombre
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
-                    {selectedMessage.full_name}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Correo
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
-                    {selectedMessage.email}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Teléfono
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
-                    {selectedMessage.phone || "Sin teléfono"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Iglesia
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
-                    {selectedMessage.church_name || "No indicó iglesia"}
-                  </p>
-                </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DetailItem label="Nombre" value={selectedMessage.full_name} />
+                <DetailItem label="Correo" value={selectedMessage.email} />
+                <DetailItem
+                  label="Teléfono"
+                  value={selectedMessage.phone || "Sin teléfono"}
+                />
+                <DetailItem
+                  label="Iglesia"
+                  value={selectedMessage.church_name || "No indicó iglesia"}
+                />
               </div>
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Mensaje
+                  Mensaje completo
                 </p>
-                <div className="mt-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-gray-700">
+                <div className="mt-2 whitespace-pre-line rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-gray-700">
                   {selectedMessage.message}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                <p className="text-sm font-bold text-gray-950">Acciones rápidas</p>
+                <p className="mt-1 text-xs leading-5 text-gray-600">
+                  Estas acciones abren herramientas externas o copian datos. No
+                  envían correos automáticamente desde IVBCC.
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <a
+                    href={mailtoHref}
+                    className="rounded-xl bg-[var(--ivbcc-navy)] px-4 py-3 text-center text-sm font-semibold text-white transition hover:opacity-90"
+                  >
+                    Responder por correo
+                  </a>
+                  {whatsappHref ? (
+                    <a
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      Responder por WhatsApp
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-400"
+                    >
+                      Sin WhatsApp
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedMessage.email, "Correo")}
+                    className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Copiar correo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyToClipboard(selectedMessage.phone, "Teléfono")
+                    }
+                    disabled={!selectedMessage.phone}
+                    className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    Copiar teléfono
+                  </button>
+                </div>
+
+                {copyFeedback ? (
+                  <p className="mt-3 text-xs font-semibold text-emerald-700">
+                    {copyFeedback}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => handleStatusChange("read")}
                   disabled={isSaving}
-                  className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                  className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
                 >
                   Marcar como leído
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleStatusChange("responded")}
+                  disabled={isSaving}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  Marcar como respondido
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleStatusChange("archived")}
                   disabled={isSaving}
-                  className="rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-60"
+                  className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-60"
                 >
                   Archivar
                 </button>
@@ -512,58 +673,91 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                   type="button"
                   onClick={handleDelete}
                   disabled={isSaving}
-                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-60"
                 >
                   Eliminar
                 </button>
               </div>
 
-              <div className="border-t pt-6">
-                <p className="text-sm font-semibold text-gray-900">
-                  Respuesta administrativa
+              <div className="border-t border-gray-100 pt-6">
+                <p className="text-sm font-bold text-gray-950">
+                  Nota interna / seguimiento
                 </p>
                 <p className="mt-1 text-sm text-gray-500">
-                  Esta respuesta se guarda internamente por ahora.
+                  Esta nota queda guardada para el equipo administrativo. No
+                  envía correo automáticamente.
                 </p>
 
+                {selectedMessage.admin_response ? (
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      Última nota guardada
+                    </p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-700">
+                      {selectedMessage.admin_response}
+                    </p>
+                    <p className="mt-3 text-xs text-gray-500">
+                      Fecha:{" "}
+                      {selectedMessage.updated_at
+                        ? selectedMessage.updated_at_label
+                        : selectedMessage.responded_at
+                          ? selectedMessage.responded_at_label
+                          : "Sin fecha registrada"}
+                    </p>
+                  </div>
+                ) : null}
+
                 <textarea
-                  value={activeResponseDraft}
+                  value={activeNoteDraft}
                   onChange={(event) =>
-                    setResponseDraft({
+                    setNoteDraft({
                       messageId: selectedMessage.id,
                       value: event.target.value,
                     })
                   }
                   rows={5}
-                  className="mt-4 w-full rounded-lg border px-4 py-3 text-sm"
-                  placeholder="Escribe aquí la respuesta o seguimiento interno..."
+                  className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+                  placeholder="Escribe una nota de seguimiento para el equipo..."
                 />
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-gray-500">
                     {selectedMessage.responded_at
-                      ? `Respondido: ${selectedMessage.responded_at_label}`
-                      : "Aún no hay respuesta registrada."}
+                      ? `Marcado como respondido: ${selectedMessage.responded_at_label}`
+                      : "Este mensaje aún no está marcado como respondido."}
                   </p>
 
                   <button
                     type="button"
-                    onClick={handleSaveResponse}
+                    onClick={handleSaveNote}
                     disabled={isSaving}
-                    className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                    className="rounded-xl bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
                   >
-                    Guardar respuesta
+                    Guardar nota interna
                   </button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-xl bg-slate-50 px-6 py-12 text-center text-sm text-gray-500">
-              Selecciona un mensaje para ver su detalle.
+            <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-gray-500">
+              Selecciona un mensaje para ver su detalle y acciones.
             </div>
           )}
-        </article>
+        </aside>
       </section>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-medium text-gray-800">
+        {value}
+      </p>
     </div>
   );
 }

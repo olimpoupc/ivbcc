@@ -11,6 +11,7 @@ const adminNavItems = [
   { href: "/admin/formacion", label: "Formación" },
   { href: "/admin/certificados", label: "Certificados" },
   { href: "/admin/inscripciones", label: "Inscripciones" },
+  { href: "/admin/contacto", label: "Contacto" },
   { href: "/admin/publicaciones", label: "Publicaciones" },
   { href: "/admin/en-vivo", label: "En Vivo" },
   { href: "/admin/chatbot", label: "Chatbot" },
