@@ -5,6 +5,20 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { buildSafeStoragePath, validateImageFile } from "@/lib/security";
+import {
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  adminFileInputClass,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type CourseStatus = "draft" | "published";
 
@@ -141,68 +155,62 @@ export default function CrearCursoPage() {
   }
 
   return (
-    <main>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Crear curso</h1>
-        <p className="mt-1 text-gray-500">
-          Registra un nuevo curso para el módulo de formación.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Formación IVBCC"
+        title="Crear curso"
+        subtitle="Registra un nuevo curso para el módulo de formación."
+        icon="book"
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Título
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-2">
+        <AdminFormField label="Título">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Slug
-          </label>
+        <AdminFormField label="Slug">
           <input
             type="text"
             value={slug}
             onChange={(e) => setSlug(normalizeSlug(e.target.value))}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
+        </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Descripción
-          </label>
+        <AdminFormField label="Descripción">
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
             rows={6}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Imagen
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
           <input
             ref={imageInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleImageChange}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminFileInputClass}
           />
+        </AdminFormField>
 
           {imagePreviewUrl && (
             <div className="mt-4">
@@ -212,26 +220,24 @@ export default function CrearCursoPage() {
                 width={640}
                 height={256}
                 unoptimized
-                className="max-h-64 w-full rounded-lg object-cover"
+                className="max-h-80 w-full rounded-[24px] object-cover"
               />
 
               <button
                 type="button"
                 onClick={handleRemoveImage}
-                className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                className={`${adminSecondaryButtonClass} mt-3`}
               >
                 Quitar imagen
               </button>
             </div>
           )}
-        </div>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-3 block text-sm font-semibold text-gray-700">
-            Estado
-          </label>
+        <AdminPanelCard>
+        <AdminFormField label="Estado">
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "draft"}>
               <input
                 type="radio"
                 name="status"
@@ -240,9 +246,9 @@ export default function CrearCursoPage() {
                 onChange={() => setStatus("draft")}
               />
               Borrador
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "published"}>
               <input
                 type="radio"
                 name="status"
@@ -251,15 +257,16 @@ export default function CrearCursoPage() {
                 onChange={() => setStatus("published")}
               />
               Publicado
-            </label>
+            </AdminRadioCard></label>
           </div>
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push("/admin/formacion")}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -267,12 +274,12 @@ export default function CrearCursoPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar curso"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

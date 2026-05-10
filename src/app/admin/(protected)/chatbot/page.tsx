@@ -1,20 +1,33 @@
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+} from "@/components/admin/AdminPrimitives";
 import ChatbotItemsPanel, { type ChatbotItemRow } from "./ChatbotItemsPanel";
+
+const chatbotItemSelect =
+  "id,title,message,category,button_text,button_url,order_index,is_active,created_at,updated_at";
 
 export default async function AdminChatbotPage() {
   const supabase = await createSupabaseServerClient();
 
   const { data: items, error } = await supabase
     .from("chatbot_items")
-    .select("*")
+    .select(chatbotItemSelect)
     .order("order_index", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) {
     return (
-      <main className="p-8 text-sm text-gray-500">
-        Error cargando respuestas del chatbot.
-      </main>
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Asistente digital"
+          title="Chatbot IVBCC"
+          subtitle="No fue posible cargar las respuestas del chatbot."
+          icon="bot"
+        />
+      </AdminPageShell>
     );
   }
 
@@ -34,35 +47,39 @@ export default async function AdminChatbotPage() {
   const activeCount = rows.filter((item) => item.is_active).length;
 
   return (
-    <main className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-950">Chatbot IVBCC</h1>
-        <p className="mt-2 max-w-3xl text-gray-600">
-          Gestiona respuestas rápidas para orientar a visitantes sobre horarios,
-          eventos, formación, contacto y otros temas frecuentes.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Asistente digital"
+        title="Chatbot IVBCC"
+        subtitle="Gestiona respuestas rápidas para orientar a visitantes sobre horarios, eventos, formación, contacto y otros temas frecuentes."
+        icon="bot"
+      />
 
       <section className="grid gap-6 md:grid-cols-3">
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-gray-950">{rows.length}</p>
-          <p className="mt-2 text-sm font-medium text-gray-500">
-            Respuestas registradas
-          </p>
-        </article>
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-gray-950">{activeCount}</p>
-          <p className="mt-2 text-sm font-medium text-gray-500">Activas</p>
-        </article>
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-gray-950">
-            {rows.length - activeCount}
-          </p>
-          <p className="mt-2 text-sm font-medium text-gray-500">Inactivas</p>
-        </article>
+        <AdminMetricCard
+          label="Respuestas registradas"
+          value={rows.length}
+          detail="Base de conocimiento"
+          icon="bot"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Activas"
+          value={activeCount}
+          detail="Disponibles al visitante"
+          icon="check"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Inactivas"
+          value={rows.length - activeCount}
+          detail="Ocultas temporalmente"
+          icon="activity"
+          tone="navy"
+        />
       </section>
 
       <ChatbotItemsPanel initialItems={rows} />
-    </main>
+    </AdminPageShell>
   );
 }

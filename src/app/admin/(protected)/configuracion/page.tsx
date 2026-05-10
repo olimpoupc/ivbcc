@@ -1,5 +1,10 @@
 import SiteSettingsForm from "./SiteSettingsForm";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+} from "@/components/admin/AdminPrimitives";
 
 type SiteSettings = {
   id: string;
@@ -19,6 +24,9 @@ type SiteSettings = {
   schedules: string | null;
   footer_text: string | null;
 };
+
+const siteSettingsSelect =
+  "id,church_name,slogan,phone,whatsapp,primary_email,address,google_maps_url,facebook_url,instagram_url,youtube_url,logo_url,hero_title,hero_subtitle,schedules,footer_text";
 
 const defaultSettingsPayload = {
   church_name: "Iglesia Valle de Bendición Cruzada Cristiana",
@@ -43,15 +51,20 @@ export default async function AdminConfiguracionPage() {
 
   const { data: existingSettings, error: settingsError } = await supabase
     .from("site_settings")
-    .select("*")
+    .select(siteSettingsSelect)
     .limit(1)
     .maybeSingle();
 
   if (settingsError) {
     return (
-      <main className="p-8 text-sm text-gray-500">
-        Error cargando la configuración general.
-      </main>
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Sistema"
+          title="Configuración general"
+          subtitle="Error cargando la configuración general."
+          icon="settings"
+        />
+      </AdminPageShell>
     );
   }
 
@@ -61,14 +74,19 @@ export default async function AdminConfiguracionPage() {
     const { data: createdSettings, error: createError } = await supabase
       .from("site_settings")
       .insert(defaultSettingsPayload)
-      .select("*")
+      .select(siteSettingsSelect)
       .maybeSingle();
 
     if (createError || !createdSettings) {
       return (
-        <main className="p-8 text-sm text-gray-500">
-          No se pudo inicializar la configuración general.
-        </main>
+        <AdminPageShell>
+          <AdminPageHeader
+            eyebrow="Sistema"
+            title="Configuración general"
+            subtitle="No se pudo inicializar la configuración general."
+            icon="settings"
+          />
+        </AdminPageShell>
       );
     }
 
@@ -76,16 +94,37 @@ export default async function AdminConfiguracionPage() {
   }
 
   return (
-    <main className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-950">
-          Configuración general
-        </h1>
-        <p className="mt-2 max-w-3xl text-gray-600">
-          Edita la información institucional global del sitio para preparar la
-          integración dinámica en navbar, footer, home y contacto.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Sistema"
+        title="Configuración general"
+        subtitle="Edita la información institucional global del sitio para preparar la integración dinámica en navbar, footer, home y contacto."
+        icon="settings"
+      />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          label="Identidad"
+          value={settings.church_name ? "OK" : "Pendiente"}
+          detail="Nombre institucional"
+          icon="home"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Contacto"
+          value={settings.primary_email || settings.phone ? "OK" : "Pendiente"}
+          detail="Correo o teléfono"
+          icon="message"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Logo"
+          value={settings.logo_url ? "OK" : "Pendiente"}
+          detail="Marca visual"
+          icon="spark"
+          tone="navy"
+        />
+      </section>
 
       <SiteSettingsForm
         initialSettings={{
@@ -107,6 +146,6 @@ export default async function AdminConfiguracionPage() {
           footer_text: settings.footer_text || "",
         }}
       />
-    </main>
+    </AdminPageShell>
   );
 }

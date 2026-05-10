@@ -3,6 +3,12 @@
 import Image from "next/image";
 import { useRef, useState } from "react";
 import AuthFeedback from "@/components/AuthFeedback";
+import { AdminPanelCard } from "@/components/admin/AdminPrimitives";
+import {
+  adminFileInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+} from "@/components/admin/AdminFormPrimitives";
 import { supabase } from "@/lib/supabase";
 import {
   buildSafeStoragePath,
@@ -83,13 +89,13 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl bg-white p-6 shadow-sm">
+    <AdminPanelCard>
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-950">{title}</h2>
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
+        <h2 className="section-title text-xl text-[var(--ivbcc-ink)]">{title}</h2>
+        <p className="muted-copy mt-1 text-sm">{description}</p>
       </div>
       <div className="grid gap-5 md:grid-cols-2">{children}</div>
-    </section>
+    </AdminPanelCard>
   );
 }
 
@@ -108,7 +114,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-gray-700">
+      <label className="form-label">
         {label}
       </label>
       <input
@@ -116,7 +122,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border px-4 py-2"
+        className="form-control"
       />
     </div>
   );
@@ -137,7 +143,7 @@ function TextAreaField({
 }) {
   return (
     <div className="md:col-span-2">
-      <label className="mb-2 block text-sm font-semibold text-gray-700">
+      <label className="form-label">
         {label}
       </label>
       <textarea
@@ -145,7 +151,7 @@ function TextAreaField({
         onChange={(event) => onChange(event.target.value)}
         rows={rows}
         placeholder={placeholder}
-        className="w-full rounded-lg border px-4 py-2"
+        className="form-control"
       />
     </div>
   );
@@ -307,13 +313,13 @@ export default function SiteSettingsForm({ initialSettings }: Props) {
           placeholder="https://..."
         />
         <div className="md:col-span-2">
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
+          <label className="form-label">
             Logo actual
           </label>
 
           {values.logo_url ? (
-            <div className="rounded-xl border bg-gray-50 p-4">
-              <div className="flex min-h-28 items-center justify-center rounded-lg bg-white p-4">
+            <div className="rounded-[24px] border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4">
+              <div className="flex min-h-28 items-center justify-center rounded-2xl bg-white p-4">
                 {values.logo_url.startsWith("/") ? (
                   <Image
                     src={values.logo_url}
@@ -335,14 +341,14 @@ export default function SiteSettingsForm({ initialSettings }: Props) {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+            <div className="rounded-[24px] border border-dashed border-[rgba(7,22,45,0.18)] bg-[var(--ivbcc-paper)] px-4 py-8 text-center text-sm font-semibold text-[var(--ivbcc-muted)]">
               Aún no hay logo configurado.
             </div>
           )}
         </div>
 
         <div className="md:col-span-2">
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
+          <label className="form-label">
             Subir nuevo logo
           </label>
           <input
@@ -350,19 +356,19 @@ export default function SiteSettingsForm({ initialSettings }: Props) {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleLogoChange}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminFileInputClass}
           />
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs font-semibold text-[var(--ivbcc-muted)]">
             Formatos permitidos: JPG, PNG, WEBP o SVG. Tamaño máximo: 5MB.
           </p>
 
           {logoFile && (
-            <div className="mt-3 rounded-lg border bg-gray-50 px-4 py-3">
-              <p className="text-sm font-medium text-gray-700">{logoFile.name}</p>
+            <div className="mt-3 rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] px-4 py-3">
+              <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">{logoFile.name}</p>
               <button
                 type="button"
                 onClick={clearLogoSelection}
-                className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                className={`${adminSecondaryButtonClass} mt-3`}
               >
                 Quitar archivo
               </button>
@@ -469,10 +475,10 @@ export default function SiteSettingsForm({ initialSettings }: Props) {
       </Section>
 
       <div className="flex justify-end">
-        <button
+      <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           {isSubmitting ? "Guardando..." : "Guardar configuración"}
         </button>

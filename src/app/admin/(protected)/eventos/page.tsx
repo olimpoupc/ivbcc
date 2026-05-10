@@ -2,27 +2,38 @@ import Image from "next/image";
 import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import DeleteEventButton from "./DeleteEventButton";
 import PublishEventButton from "./PublishEventButton";
 
 const statusConfig = {
   published: {
     label: "Publicado",
-    className: "bg-green-50 text-green-700 border-green-200",
+    tone: "green",
   },
   scheduled: {
     label: "Programado",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
+    tone: "blue",
   },
   draft: {
     label: "Borrador",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    tone: "amber",
   },
   cancelled: {
     label: "Cancelado",
-    className: "bg-red-50 text-red-700 border-red-200",
+    tone: "red",
   },
-};
+} as const;
+
+const eventSelect =
+  "id,title,slug,description,image_url,status,event_date,location,created_at";
 
 function formatDateTimeColombia(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -38,31 +49,63 @@ export default async function AdminEventosPage() {
   const supabase = await createSupabaseServerClient();
   const { data: eventos } = await supabase
     .from("events")
-    .select("*")
+    .select(eventSelect)
     .order("event_date", { ascending: false });
 
-  return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Administración
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Administrar eventos
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-500">
-            Gestiona eventos publicados, programados, borradores y cancelados.
-          </p>
-        </div>
+  const now = new Date();
+  const upcomingCount =
+    eventos?.filter((evento) => evento.event_date && new Date(evento.event_date) >= now)
+      .length || 0;
+  const publishedCount =
+    eventos?.filter((evento) => (evento.status || "draft") === "published")
+      .length || 0;
+  const draftCount =
+    eventos?.filter((evento) => (evento.status || "draft") === "draft").length || 0;
 
-        <Link
-          href="/admin/eventos/crear"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-        >
-          + Crear nuevo evento
-        </Link>
-      </div>
+  return (
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Administración"
+        title="Administrar eventos"
+        subtitle="Gestiona eventos publicados, programados, borradores y cancelados."
+        icon="calendar"
+        actions={
+          <AdminActionButton href="/admin/eventos/crear" icon="plus" tone="gold">
+            Crear nuevo evento
+          </AdminActionButton>
+        }
+      />
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <AdminMetricCard
+          label="Eventos totales"
+          value={eventos?.length || 0}
+          detail="Registros creados"
+          icon="calendar"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Próximos"
+          value={upcomingCount}
+          detail="Desde hoy en adelante"
+          icon="activity"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Publicados"
+          value={publishedCount}
+          detail="Visibles en el sitio"
+          icon="check"
+          tone="navy"
+        />
+        <AdminMetricCard
+          label="Borradores"
+          value={draftCount}
+          detail="Pendientes de publicar"
+          icon="file"
+          tone="slate"
+        />
+      </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {eventos?.map((evento, index) => {
@@ -74,9 +117,9 @@ export default async function AdminEventosPage() {
           return (
             <article
               key={evento.id}
-              className="overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="premium-surface overflow-hidden rounded-[24px] transition hover:-translate-y-0.5 hover:shadow-xl"
             >
-              <div className="relative h-44 bg-gray-100">
+              <div className="relative h-44 bg-[var(--ivbcc-paper)]">
                 {evento.image_url ? (
                   <Image
                     src={evento.image_url}
@@ -94,41 +137,41 @@ export default async function AdminEventosPage() {
                   />
                 )}
 
-                <span
-                  className={`absolute left-4 top-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${currentStatus.className}`}
-                >
-                  {currentStatus.label}
+                <span className="absolute left-4 top-4">
+                  <AdminStatusBadge tone={currentStatus.tone}>
+                    {currentStatus.label}
+                  </AdminStatusBadge>
                 </span>
               </div>
 
               <div className="flex min-h-64 flex-col p-5">
                 <div className="flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="kicker">
                     {evento.slug}
                   </p>
-                  <h2 className="mt-2 line-clamp-2 text-lg font-bold leading-tight text-gray-950">
+                  <h2 className="section-title mt-2 line-clamp-2 text-lg leading-tight text-[var(--ivbcc-ink)]">
                     {evento.title}
                   </h2>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-gray-500">
+                  <p className="muted-copy mt-3 line-clamp-2 text-sm leading-6">
                     {evento.description}
                   </p>
                 </div>
 
-                <div className="mt-5 space-y-3 border-t pt-4">
+                <div className="mt-5 space-y-3 border-t border-[var(--ivbcc-line)] pt-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="kicker">
                       Fecha del evento
                     </p>
-                    <p className="mt-1 text-sm font-medium text-gray-700">
+                    <p className="mt-1 text-sm font-semibold text-[var(--ivbcc-ink)]">
                       {formatDateTimeColombia(evento.event_date)}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="kicker">
                       Ubicación
                     </p>
-                    <p className="mt-1 text-sm font-medium text-gray-700">
+                    <p className="mt-1 text-sm font-semibold text-[var(--ivbcc-ink)]">
                       {evento.location || "Sin ubicación"}
                     </p>
                   </div>
@@ -141,13 +184,13 @@ export default async function AdminEventosPage() {
 
                   <Link
                     href={`/admin/eventos/${evento.id}/inscritos`}
-                    className="mt-2 rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                    className="mt-2 rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
                   >
                     Ver inscritos
                   </Link>
                   <Link
                     href={`/admin/eventos/${evento.id}/editar`}
-                    className="mt-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
+                    className="mt-2 rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
@@ -159,11 +202,20 @@ export default async function AdminEventosPage() {
         })}
 
         {eventos?.length === 0 && (
-          <div className="rounded-xl border bg-white px-5 py-12 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">
-            Aún no hay eventos registrados.
+          <div className="md:col-span-2 xl:col-span-3">
+            <AdminEmptyState
+              title="Aún no hay eventos registrados"
+              description="Crea el primer evento para publicarlo en el sitio."
+              icon="calendar"
+              action={
+                <AdminActionButton href="/admin/eventos/crear" icon="plus" tone="gold">
+                  Crear evento
+                </AdminActionButton>
+              }
+            />
           </div>
         )}
       </section>
-    </main>
+    </AdminPageShell>
   );
 }

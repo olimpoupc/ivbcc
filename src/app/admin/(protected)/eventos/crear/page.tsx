@@ -5,6 +5,21 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { buildSafeStoragePath, validateImageFile } from "@/lib/security";
+import {
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  AdminToggleCard,
+  adminFileInputClass,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type EventStatus = "draft" | "published" | "scheduled" | "cancelled";
 
@@ -152,69 +167,62 @@ export default function CrearEventoPage() {
   }
 
   return (
-    <main>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Crear evento</h1>
-        <p className="mt-1 text-gray-500">
-          Registra un nuevo evento de IVBCC con su fecha, ubicación, estado e
-          imagen.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Agenda ministerial"
+        title="Crear evento"
+        subtitle="Registra un nuevo evento de IVBCC con su fecha, ubicación, estado e imagen."
+        icon="calendar"
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Título
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-2">
+        <AdminFormField label="Título">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Slug
-          </label>
+        <AdminFormField label="Slug">
           <input
             type="text"
             value={slug}
             onChange={(e) => setSlug(normalizeSlug(e.target.value))}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
+        </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Descripción
-          </label>
+        <AdminFormField label="Descripción">
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
             rows={6}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Imagen
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
           <input
             ref={imageInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleImageChange}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminFileInputClass}
           />
+        </AdminFormField>
 
           {imagePreviewUrl && (
             <div className="mt-4">
@@ -224,53 +232,45 @@ export default function CrearEventoPage() {
                 width={640}
                 height={256}
                 unoptimized
-                className="max-h-64 w-full rounded-lg object-cover"
+                className="max-h-80 w-full rounded-[24px] object-cover"
               />
 
               <button
                 type="button"
                 onClick={handleRemoveImage}
-                className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                className={`${adminSecondaryButtonClass} mt-3`}
               >
                 Quitar imagen
               </button>
             </div>
           )}
-        </div>
+        </AdminPanelCard>
 
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Fecha del evento
-            </label>
+          <AdminFormField label="Fecha del evento">
             <input
               type="datetime-local"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Ubicación
-            </label>
+          <AdminFormField label="Ubicación">
             <input
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-3 block text-sm font-semibold text-gray-700">
-            Estado
-          </label>
+        <AdminFormField label="Estado">
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "draft"}>
               <input
                 type="radio"
                 name="status"
@@ -279,9 +279,9 @@ export default function CrearEventoPage() {
                 onChange={() => setStatus("draft")}
               />
               Borrador
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "published"}>
               <input
                 type="radio"
                 name="status"
@@ -290,9 +290,9 @@ export default function CrearEventoPage() {
                 onChange={() => setStatus("published")}
               />
               Publicado
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "scheduled"}>
               <input
                 type="radio"
                 name="status"
@@ -301,9 +301,9 @@ export default function CrearEventoPage() {
                 onChange={() => setStatus("scheduled")}
               />
               Programado
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "cancelled"}>
               <input
                 type="radio"
                 name="status"
@@ -312,26 +312,27 @@ export default function CrearEventoPage() {
                 onChange={() => setStatus("cancelled")}
               />
               Cancelado
-            </label>
+            </AdminRadioCard></label>
           </div>
-        </div>
+        </AdminFormField>
 
-        <label className="flex items-center gap-3 rounded-lg border px-4 py-3">
+        <label>
+          <AdminToggleCard checked={registrationEnabled}>
           <input
             type="checkbox"
             checked={registrationEnabled}
             onChange={(e) => setRegistrationEnabled(e.target.checked)}
           />
-          <span className="text-sm font-semibold text-gray-700">
-            Permitir inscripciones
-          </span>
+          Permitir inscripciones
+          </AdminToggleCard>
         </label>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push("/admin/eventos")}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -339,12 +340,12 @@ export default function CrearEventoPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar evento"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

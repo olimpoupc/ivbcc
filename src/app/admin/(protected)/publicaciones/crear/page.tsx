@@ -9,6 +9,22 @@ import {
   validateDocumentFile,
   validateImageFile,
 } from "@/lib/security";
+import {
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  AdminToggleCard,
+  adminFileInputClass,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSelectClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type PublicationStatus = "draft" | "published";
 type PublicationCategory =
@@ -247,81 +263,69 @@ export default function CrearPublicacionPage() {
   }
 
   return (
-    <main>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Crear publicación</h1>
-        <p className="mt-1 text-gray-500">
-          Registra un nuevo contenido institucional, ministerial o multimedia.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Biblioteca editorial"
+        title="Crear publicación"
+        subtitle="Registra un nuevo contenido institucional, ministerial o multimedia."
+        icon="file"
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Título
-            </label>
+          <AdminFormField label="Título">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Slug
-            </label>
+          <AdminFormField label="Slug">
             <input
               type="text"
               value={slug}
               onChange={(e) => setSlug(normalizeSlug(e.target.value))}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Resumen
-          </label>
+        <AdminFormField label="Resumen">
           <textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Contenido
-          </label>
+        <AdminFormField label="Contenido">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={8}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Categoría
-            </label>
+          <AdminFormField label="Categoría">
             <select
               value={category}
               onChange={(e) =>
                 setCategory(e.target.value as PublicationCategory)
               }
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminSelectClass}
             >
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -329,33 +333,30 @@ export default function CrearPublicacionPage() {
                 </option>
               ))}
             </select>
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              URL de video
-            </label>
+          <AdminFormField label="URL de video">
             <input
               type="url"
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
+        </AdminPanelCard>
 
+        <AdminPanelCard>
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Imagen
-            </label>
+          <AdminFormField label="Imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
             <input
               ref={imageInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleImageChange}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminFileInputClass}
             />
+          </AdminFormField>
 
             {imagePreviewUrl && (
               <div className="mt-4">
@@ -365,41 +366,39 @@ export default function CrearPublicacionPage() {
                   width={640}
                   height={256}
                   unoptimized
-                  className="max-h-64 w-full rounded-lg object-cover"
+                  className="max-h-80 w-full rounded-[24px] object-cover"
                 />
 
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                  className={`${adminSecondaryButtonClass} mt-3`}
                 >
                   Quitar imagen
                 </button>
               </div>
             )}
-          </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Documento / archivo
-            </label>
+            <AdminFormField label="Documento / archivo" hint="PDF, DOC o DOCX.">
             <input
               ref={documentInputRef}
               type="file"
               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={handleFileChange}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminFileInputClass}
             />
+            </AdminFormField>
 
             {fileDocument && (
-              <div className="mt-4 rounded-lg border bg-gray-50 px-4 py-3">
-                <p className="text-sm font-medium text-gray-700">
+              <div className="mt-4 rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] px-4 py-3">
+                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
                   {fileDocument.name}
                 </p>
                 <button
                   type="button"
                   onClick={handleRemoveDocument}
-                  className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                  className={`${adminSecondaryButtonClass} mt-3`}
                 >
                   Quitar archivo
                 </button>
@@ -407,14 +406,13 @@ export default function CrearPublicacionPage() {
             )}
           </div>
         </div>
+        </AdminPanelCard>
 
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Estado
-            </label>
+          <AdminFormField label="Estado">
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+              <label><AdminRadioCard checked={status === "draft"}>
                 <input
                   type="radio"
                   name="status"
@@ -423,9 +421,9 @@ export default function CrearPublicacionPage() {
                   onChange={() => setStatus("draft")}
                 />
                 Borrador
-              </label>
+              </AdminRadioCard></label>
 
-              <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+              <label><AdminRadioCard checked={status === "published"}>
                 <input
                   type="radio"
                   name="status"
@@ -434,39 +432,37 @@ export default function CrearPublicacionPage() {
                   onChange={() => setStatus("published")}
                 />
                 Publicada
-              </label>
+              </AdminRadioCard></label>
             </div>
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Fecha de publicación
-            </label>
+          <AdminFormField label="Fecha de publicación">
             <input
               type="datetime-local"
               value={publishedAt}
               onChange={(e) => setPublishedAt(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
 
-        <label className="flex items-center gap-3 rounded-lg border px-4 py-3">
+        <label>
+          <AdminToggleCard checked={featured}>
           <input
             type="checkbox"
             checked={featured}
             onChange={(e) => setFeatured(e.target.checked)}
           />
-          <span className="text-sm font-semibold text-gray-700">
-            Marcar como destacada
-          </span>
+          Marcar como destacada
+          </AdminToggleCard>
         </label>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push("/admin/publicaciones")}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -474,12 +470,12 @@ export default function CrearPublicacionPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar publicación"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

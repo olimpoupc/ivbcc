@@ -1,4 +1,8 @@
 import QuizEditorForm from "../../QuizEditorForm";
+import {
+  AdminPageHeader,
+  AdminPageShell,
+} from "@/components/admin/AdminPrimitives";
 
 type Props = {
   params: Promise<{
@@ -11,15 +15,15 @@ export default async function EditarQuizPage({ params }: Props) {
   const { id, quizId } = await params;
 
   return (
-    <main>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Editar quiz</h1>
-        <p className="mt-1 text-gray-500">
-          Ajusta el quiz, sus preguntas y las respuestas correctas.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Evaluación"
+        title="Editar quiz"
+        subtitle="Ajusta el quiz, sus preguntas y las respuestas correctas."
+        icon="check"
+      />
 
       <QuizEditorForm courseId={id} quizId={quizId} mode="edit" />
-    </main>
+    </AdminPageShell>
   );
 }

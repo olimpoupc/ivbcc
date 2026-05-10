@@ -1,5 +1,13 @@
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+} from "@/components/admin/AdminPrimitives";
 import ContactMessagesPanel from "./ContactMessagesPanel";
+
+const contactMessageSelect =
+  "id,full_name,email,phone,church_name,subject,category,message,status,admin_response,responded_at,updated_at,created_at";
 
 function formatDateColombia(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -18,12 +26,21 @@ export default async function AdminContactoPage() {
     await Promise.all([
       supabase
         .from("contact_messages")
-        .select("*")
+        .select(contactMessageSelect)
         .order("created_at", { ascending: false }),
     ]);
 
   if (error) {
-    return <main className="p-8 text-sm text-gray-500">Error cargando mensajes.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Bandeja administrativa"
+          title="Contacto"
+          subtitle="No fue posible cargar los mensajes en este momento."
+          icon="message"
+        />
+      </AdminPageShell>
+    );
   }
 
   const rows = (messages || []).map((message) => ({
@@ -45,21 +62,43 @@ export default async function AdminContactoPage() {
     updated_at_label: formatDateColombia(message.updated_at),
   }));
 
+  const pendingMessages = rows.filter((message) => message.status === "pending").length;
+  const respondedMessages = rows.filter((message) => message.status === "responded").length;
+
   return (
-    <main className="space-y-8">
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-          Bandeja administrativa
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-gray-950">Contacto</h1>
-        <p className="mt-2 max-w-3xl text-gray-600">
-          Gestiona mensajes recibidos desde la página pública de contacto,
-          revisa su estado y responde por correo o WhatsApp usando enlaces
-          rápidos del navegador.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Bandeja administrativa"
+        title="Contacto"
+        subtitle="Gestiona mensajes recibidos desde la página pública de contacto, revisa su estado y responde por correo o WhatsApp usando enlaces rápidos del navegador."
+        icon="message"
+      />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          label="Mensajes recibidos"
+          value={rows.length}
+          detail="Total histórico visible"
+          icon="message"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Pendientes"
+          value={pendingMessages}
+          detail="Requieren atención"
+          icon="activity"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Respondidos"
+          value={respondedMessages}
+          detail="Seguimiento completado"
+          icon="check"
+          tone="navy"
+        />
+      </section>
 
       <ContactMessagesPanel initialMessages={rows} />
-    </main>
+    </AdminPageShell>
   );
 }

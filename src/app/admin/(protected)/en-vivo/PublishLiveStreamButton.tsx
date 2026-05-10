@@ -32,7 +32,7 @@ export default function PublishLiveStreamButton({ id }: Props) {
   return (
     <button
       onClick={handlePublish}
-      className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700"
+      className="rounded-full bg-green-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-green-700"
     >
       Publicar
     </button>

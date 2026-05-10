@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 import AuthFeedback from "@/components/AuthFeedback";
+import {
+  AdminEmptyState,
+  AdminPanelCard,
+  AdminSection,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import { supabase } from "@/lib/supabase";
 
 type ChatbotCategory =
@@ -72,6 +78,9 @@ const emptyForm: FormState = {
 const categoryLabels = Object.fromEntries(
   categoryOptions.map((category) => [category.value, category.label])
 ) as Record<ChatbotCategory, string>;
+
+const chatbotItemSelect =
+  "id,title,message,category,button_text,button_url,order_index,is_active,created_at,updated_at";
 
 function toFormState(item: ChatbotItemRow): FormState {
   return {
@@ -155,7 +164,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
         .from("chatbot_items")
         .update(payload)
         .eq("id", editingId)
-        .select("*")
+        .select(chatbotItemSelect)
         .maybeSingle();
 
       setIsSaving(false);
@@ -186,7 +195,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     const { data, error } = await supabase
       .from("chatbot_items")
       .insert(payload)
-      .select("*")
+      .select(chatbotItemSelect)
       .maybeSingle();
 
     setIsSaving(false);
@@ -217,7 +226,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
       .from("chatbot_items")
       .update({ is_active: !item.is_active })
       .eq("id", item.id)
-      .select("*")
+      .select(chatbotItemSelect)
       .maybeSingle();
 
     setIsSaving(false);
@@ -280,12 +289,13 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
 
   return (
     <section className="grid gap-8 xl:grid-cols-[0.8fr_1.2fr]">
-      <article className="rounded-xl bg-white p-6 shadow-sm">
+      <AdminPanelCard>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-950">
+          <p className="kicker">{isEditing ? "Edición" : "Nueva respuesta"}</p>
+          <h2 className="section-title mt-1 text-xl text-[var(--ivbcc-ink)]">
             {isEditing ? "Editar respuesta" : "Crear respuesta"}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="muted-copy mt-1 text-sm">
             Define el texto que verá el visitante y el enlace opcional del
             botón.
           </p>
@@ -293,34 +303,34 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Título
             </label>
             <input
               type="text"
               value={form.title}
               onChange={(event) => updateForm("title", event.target.value)}
-              className="w-full rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+              className={inputClassName}
               placeholder="Ej: Horarios"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Mensaje
             </label>
             <textarea
               value={form.message}
               onChange={(event) => updateForm("message", event.target.value)}
               rows={5}
-              className="w-full rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+              className={textareaClassName}
               placeholder="Escribe la respuesta rápida del chatbot..."
             />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
                 Categoría
               </label>
               <select
@@ -328,7 +338,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 onChange={(event) =>
                   updateForm("category", event.target.value as ChatbotCategory)
                 }
-                className="w-full rounded-lg border px-4 py-2 text-sm"
+                className={inputClassName}
               >
                 {categoryOptions.map((category) => (
                   <option key={category.value} value={category.value}>
@@ -339,7 +349,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
                 Orden
               </label>
               <input
@@ -348,14 +358,14 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 onChange={(event) =>
                   updateForm("order_index", event.target.value)
                 }
-                className="w-full rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+                className={inputClassName}
               />
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
                 Texto del botón
               </label>
               <input
@@ -364,13 +374,13 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 onChange={(event) =>
                   updateForm("button_text", event.target.value)
                 }
-                className="w-full rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+                className={inputClassName}
                 placeholder="Ej: Ver eventos"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
                 URL del botón
               </label>
               <input
@@ -379,18 +389,18 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 onChange={(event) =>
                   updateForm("button_url", event.target.value)
                 }
-                className="w-full rounded-lg border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+                className={inputClassName}
                 placeholder="/eventos o https://..."
               />
             </div>
           </div>
 
-          <label className="flex items-center gap-3 text-sm font-semibold text-gray-700">
+          <label className="flex items-center gap-3 rounded-2xl border border-[var(--ivbcc-line)] bg-white/70 px-4 py-3 text-sm font-extrabold text-[var(--ivbcc-ink)]">
             <input
               type="checkbox"
               checked={form.is_active}
               onChange={(event) => updateForm("is_active", event.target.checked)}
-              className="h-4 w-4"
+              className="h-4 w-4 accent-[var(--ivbcc-gold)]"
             />
             Activa
           </label>
@@ -401,7 +411,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              className="rounded-full bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-navy)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
             >
               {isEditing ? "Guardar cambios" : "Crear respuesta"}
             </button>
@@ -411,29 +421,26 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 type="button"
                 onClick={resetForm}
                 disabled={isSaving}
-                className="rounded-lg border px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                className="rounded-full border border-[var(--ivbcc-line)] bg-white px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-ink)] transition hover:bg-[var(--ivbcc-paper)] disabled:opacity-60"
               >
                 Cancelar edición
               </button>
             )}
           </div>
         </form>
-      </article>
+      </AdminPanelCard>
 
-      <article className="rounded-xl bg-white p-6 shadow-sm">
-        <div className="mb-5">
-          <h2 className="text-xl font-bold text-gray-950">
-            Respuestas rápidas
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Se muestran ordenadas por el campo de orden.
-          </p>
-        </div>
+      <AdminSection
+        title="Respuestas rápidas"
+        subtitle="Se muestran ordenadas por el campo de orden."
+        icon="bot"
+      >
+        <AdminPanelCard>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <table className="min-w-full divide-y divide-[var(--ivbcc-line)] text-sm">
+            <thead className="bg-[var(--ivbcc-paper)]">
+              <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-[var(--ivbcc-muted)]">
                 <th className="pb-3 pr-4">Orden</th>
                 <th className="pb-3 pr-4">Respuesta</th>
                 <th className="pb-3 pr-4">Categoría</th>
@@ -441,39 +448,33 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                 <th className="pb-3 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[var(--ivbcc-line)]">
               {sortedItems.map((item) => (
-                <tr key={item.id} className="align-top text-gray-700">
+                <tr key={item.id} className="align-top text-[var(--ivbcc-muted)]">
                   <td className="py-4 pr-4 font-semibold">
                     {item.order_index}
                   </td>
                   <td className="max-w-sm py-4 pr-4">
-                    <p className="font-semibold text-gray-950">{item.title}</p>
-                    <p className="mt-1 line-clamp-2 text-gray-500">
+                    <p className="font-extrabold text-[var(--ivbcc-ink)]">{item.title}</p>
+                    <p className="mt-1 line-clamp-2 text-[var(--ivbcc-muted)]">
                       {item.message}
                     </p>
                     {(item.button_text || item.button_url) && (
-                      <p className="mt-2 text-xs font-medium text-gray-400">
+                      <p className="mt-2 text-xs font-semibold text-[var(--ivbcc-muted)]">
                         {item.button_text || "Botón"} ·{" "}
                         {item.button_url || "Sin URL"}
                       </p>
                     )}
                   </td>
                   <td className="py-4 pr-4">
-                    <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    <AdminStatusBadge tone="blue">
                       {categoryLabels[item.category]}
-                    </span>
+                    </AdminStatusBadge>
                   </td>
                   <td className="py-4 pr-4">
-                    <span
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                        item.is_active
-                          ? "border-green-200 bg-green-50 text-green-700"
-                          : "border-slate-200 bg-slate-100 text-slate-600"
-                      }`}
-                    >
+                    <AdminStatusBadge tone={item.is_active ? "green" : "slate"}>
                       {item.is_active ? "Activa" : "Inactiva"}
-                    </span>
+                    </AdminStatusBadge>
                   </td>
                   <td className="py-4">
                     <div className="flex flex-wrap justify-end gap-2">
@@ -481,7 +482,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                         type="button"
                         onClick={() => handleToggle(item)}
                         disabled={isSaving}
-                        className="rounded-lg border px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                        className="rounded-full border border-[var(--ivbcc-line)] bg-white px-3 py-2 text-xs font-extrabold text-[var(--ivbcc-ink)] transition hover:bg-[var(--ivbcc-paper)] disabled:opacity-60"
                       >
                         {item.is_active ? "Desactivar" : "Activar"}
                       </button>
@@ -489,7 +490,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                         type="button"
                         onClick={() => handleEdit(item)}
                         disabled={isSaving}
-                        className="rounded-lg bg-yellow-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-yellow-600 disabled:opacity-60"
+                        className="rounded-full bg-[var(--ivbcc-gold)] px-3 py-2 text-xs font-extrabold text-[var(--ivbcc-navy)] transition hover:opacity-90 disabled:opacity-60"
                       >
                         Editar
                       </button>
@@ -497,7 +498,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                         type="button"
                         onClick={() => handleDelete(item)}
                         disabled={isSaving}
-                        className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                        className="rounded-full bg-red-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-red-700 disabled:opacity-60"
                       >
                         Eliminar
                       </button>
@@ -510,11 +511,20 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
         </div>
 
         {sortedItems.length === 0 && (
-          <div className="rounded-xl bg-slate-50 px-6 py-12 text-center text-sm text-gray-500">
-            Aún no hay respuestas rápidas registradas.
-          </div>
+          <AdminEmptyState
+            title="Aún no hay respuestas rápidas"
+            description="Crea la primera respuesta para alimentar el chatbot público."
+            icon="bot"
+          />
         )}
-      </article>
+        </AdminPanelCard>
+      </AdminSection>
     </section>
   );
 }
+
+const inputClassName =
+  "w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]";
+
+const textareaClassName =
+  "w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]";

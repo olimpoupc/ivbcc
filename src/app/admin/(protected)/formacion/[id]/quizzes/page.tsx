@@ -1,18 +1,26 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import DeleteQuizButton from "./DeleteQuizButton";
 import PublishQuizButton from "./PublishQuizButton";
 
 const statusConfig = {
   published: {
     label: "Publicado",
-    className: "bg-green-50 text-green-700 border-green-200",
+    tone: "green",
   },
   draft: {
     label: "Borrador",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    tone: "amber",
   },
-};
+} as const;
 
 type Props = {
   params: Promise<{
@@ -30,52 +38,55 @@ export default async function CursoQuizzesPage({ params }: Props) {
       supabase.from("lessons").select("id,title").eq("course_id", id),
       supabase
         .from("quizzes")
-        .select("*")
+        .select("id,title,status,lesson_id,created_at")
         .eq("course_id", id)
         .order("created_at", { ascending: false }),
     ]);
 
   if (courseError || !course) {
-    return <main className="p-10">Curso no encontrado.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader eyebrow="Formación" title="Curso no encontrado" icon="book" />
+      </AdminPageShell>
+    );
   }
 
   if (quizzesError) {
-    return <main className="p-10">Error cargando quizzes.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Formación"
+          title="Quizzes del curso"
+          subtitle="Error cargando quizzes."
+          icon="book"
+        />
+      </AdminPageShell>
+    );
   }
 
   const lessonsMap = new Map((lessons || []).map((lesson) => [lesson.id, lesson.title]));
 
   return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Formación
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Quizzes del curso
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">{course.title}</p>
-        </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Formación"
+        title="Quizzes del curso"
+        subtitle={course.title}
+        icon="book"
+        actions={
+          <>
+            <AdminActionButton href={`/admin/formacion/${id}/quizzes/crear`} icon="plus" tone="gold">
+              Crear quiz
+            </AdminActionButton>
+            <AdminActionButton href="/admin/formacion" icon="arrow" tone="outline">
+              Volver a cursos
+            </AdminActionButton>
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href={`/admin/formacion/${id}/quizzes/crear`}
-            className="inline-flex w-fit items-center justify-center rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-          >
-            + Crear quiz
-          </Link>
-          <Link
-            href="/admin/formacion"
-            className="inline-flex w-fit items-center justify-center rounded-lg border px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
-          >
-            Volver a cursos
-          </Link>
-        </div>
-      </div>
-
-      <section className="overflow-hidden rounded-xl bg-white shadow-sm">
-        <div className="grid grid-cols-12 border-b bg-gray-50 px-5 py-3 text-sm font-semibold text-gray-600">
+      <AdminPanelCard className="overflow-hidden p-0">
+        <div className="hidden grid-cols-12 border-b border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-muted)] lg:grid">
           <div className="col-span-4">Título</div>
           <div className="col-span-3">Estado</div>
           <div className="col-span-3">Lección</div>
@@ -92,26 +103,24 @@ export default async function CursoQuizzesPage({ params }: Props) {
             return (
               <article
                 key={quiz.id}
-                className="grid grid-cols-12 items-center border-b px-5 py-4 text-sm"
+                className="grid gap-3 border-b border-[var(--ivbcc-line)] px-5 py-4 text-sm lg:grid-cols-12 lg:items-center"
               >
-                <div className="col-span-4 font-semibold text-gray-900">
+                <div className="font-extrabold text-[var(--ivbcc-ink)] lg:col-span-4">
                   {quiz.title}
                 </div>
-                <div className="col-span-3">
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${currentStatus.className}`}
-                  >
+                <div className="lg:col-span-3">
+                  <AdminStatusBadge tone={currentStatus.tone}>
                     {currentStatus.label}
-                  </span>
+                  </AdminStatusBadge>
                 </div>
-                <div className="col-span-3 text-gray-600">
+                <div className="text-[var(--ivbcc-muted)] lg:col-span-3">
                   {quiz.lesson_id ? lessonsMap.get(quiz.lesson_id) || "Lección no encontrada" : "Quiz general"}
                 </div>
-                <div className="col-span-2 flex justify-end gap-2">
+                <div className="flex flex-wrap gap-2 lg:col-span-2 lg:justify-end">
                   {quiz.status === "draft" && <PublishQuizButton id={quiz.id} />}
                   <Link
                     href={`/admin/formacion/${id}/quizzes/${quiz.id}/editar`}
-                    className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
+                    className="rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
@@ -121,11 +130,15 @@ export default async function CursoQuizzesPage({ params }: Props) {
             );
           })
         ) : (
-          <div className="px-5 py-12 text-center text-sm text-gray-500">
-            Este curso aún no tiene quizzes.
+          <div className="p-6">
+            <AdminEmptyState
+              title="Este curso aún no tiene quizzes"
+              description="Crea el primer quiz para evaluar el avance del curso."
+              icon="book"
+            />
           </div>
         )}
-      </section>
-    </main>
+      </AdminPanelCard>
+    </AdminPageShell>
   );
 }

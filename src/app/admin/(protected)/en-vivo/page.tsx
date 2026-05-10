@@ -1,18 +1,26 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import DeleteLiveStreamButton from "./DeleteLiveStreamButton";
 import PublishLiveStreamButton from "./PublishLiveStreamButton";
 
 const statusConfig = {
   published: {
     label: "Publicado",
-    className: "bg-green-50 text-green-700 border-green-200",
+    tone: "green",
   },
   draft: {
     label: "Borrador",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    tone: "amber",
   },
-};
+} as const;
 
 const categoryConfig = {
   live: "En vivo",
@@ -21,6 +29,9 @@ const categoryConfig = {
   teaching: "Enseñanza",
   special: "Especial",
 };
+
+const liveStreamSelect =
+  "id,title,slug,description,youtube_url,status,category,is_live,featured,scheduled_at,ends_at,created_at";
 
 function formatDateTimeColombia(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -36,33 +47,64 @@ export default async function AdminEnVivoPage() {
   const supabase = await createSupabaseServerClient();
   const { data: liveStreams } = await supabase
     .from("live_streams")
-    .select("*")
+    .select(liveStreamSelect)
     .order("scheduled_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Administración
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Administrar transmisiones
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-500">
-            Gestiona transmisiones en vivo, dominicales, prédicas, enseñanzas
-            y videos especiales de IVBCC.
-          </p>
-        </div>
+  const now = new Date();
+  const activeLiveCount = liveStreams?.filter((stream) => stream.is_live).length || 0;
+  const scheduledCount =
+    liveStreams?.filter(
+      (stream) => stream.scheduled_at && new Date(stream.scheduled_at) >= now
+    ).length || 0;
+  const publishedCount =
+    liveStreams?.filter((stream) => (stream.status || "draft") === "published")
+      .length || 0;
 
-        <Link
-          href="/admin/en-vivo/crear"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-        >
-          + Crear transmisión
-        </Link>
-      </div>
+  return (
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Administración"
+        title="Administrar transmisiones"
+        subtitle="Gestiona transmisiones en vivo, dominicales, prédicas, enseñanzas y videos especiales de IVBCC."
+        icon="stream"
+        actions={
+          <AdminActionButton href="/admin/en-vivo/crear" icon="plus" tone="gold">
+            Crear transmisión
+          </AdminActionButton>
+        }
+      />
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <AdminMetricCard
+          label="Transmisiones"
+          value={liveStreams?.length || 0}
+          detail="Registros totales"
+          icon="stream"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="En vivo"
+          value={activeLiveCount}
+          detail="Marcadas como activas"
+          icon="activity"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Programadas"
+          value={scheduledCount}
+          detail="Próximas emisiones"
+          icon="calendar"
+          tone="navy"
+        />
+        <AdminMetricCard
+          label="Publicadas"
+          value={publishedCount}
+          detail="Visibles públicamente"
+          icon="check"
+          tone="slate"
+        />
+      </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {liveStreams?.map((stream) => {
@@ -77,72 +119,70 @@ export default async function AdminEnVivoPage() {
           return (
             <article
               key={stream.id}
-              className="overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="premium-surface overflow-hidden rounded-[24px] transition hover:-translate-y-0.5 hover:shadow-xl"
             >
               <div className="flex min-h-80 flex-col p-5">
                 <div className="flex flex-wrap gap-2">
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${currentStatus.className}`}
-                  >
+                  <AdminStatusBadge tone={currentStatus.tone}>
                     {currentStatus.label}
-                  </span>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  </AdminStatusBadge>
+                  <AdminStatusBadge tone="slate">
                     {category}
-                  </span>
+                  </AdminStatusBadge>
                   {stream.is_live && (
-                    <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 shadow-sm">
+                    <AdminStatusBadge tone="red">
                       En vivo actual
-                    </span>
+                    </AdminStatusBadge>
                   )}
                   {stream.featured && (
-                    <span className="inline-flex rounded-full border border-[var(--ivbcc-gold)] bg-[#f6f0dc] px-3 py-1 text-xs font-semibold text-[var(--ivbcc-navy)] shadow-sm">
+                    <AdminStatusBadge tone="gold">
                       Destacado
-                    </span>
+                    </AdminStatusBadge>
                   )}
                 </div>
 
                 <div className="mt-5 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="kicker">
                     {stream.slug}
                   </p>
-                  <h2 className="mt-2 line-clamp-2 text-lg font-bold leading-tight text-gray-950">
+                  <h2 className="section-title mt-2 line-clamp-2 text-lg leading-tight text-[var(--ivbcc-ink)]">
                     {stream.title}
                   </h2>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-500">
+                  <p className="muted-copy mt-3 line-clamp-3 text-sm leading-6">
                     {stream.description || "Sin descripción"}
                   </p>
                 </div>
 
-                <div className="mt-5 space-y-3 border-t pt-4">
+                <div className="mt-5 space-y-3 border-t border-[var(--ivbcc-line)] pt-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="kicker">
                       Programación
                     </p>
-                    <p className="mt-1 text-sm font-medium text-gray-700">
+                    <p className="mt-1 text-sm font-semibold text-[var(--ivbcc-ink)]">
                       {formatDateTimeColombia(stream.scheduled_at)}
                     </p>
                   </div>
 
                   {stream.ends_at ? (
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      <p className="kicker">
                         Finalización
                       </p>
-                      <p className="mt-1 text-sm font-medium text-gray-700">
+                      <p className="mt-1 text-sm font-semibold text-[var(--ivbcc-ink)]">
                         {formatDateTimeColombia(stream.ends_at)}
                       </p>
                     </div>
                   ) : null}
 
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="kicker">
                       YouTube
                     </p>
                     <a
                       href={stream.youtube_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 line-clamp-1 block text-sm font-medium text-[var(--ivbcc-navy)] hover:underline"
+                      className="mt-1 line-clamp-1 block text-sm font-semibold text-[var(--ivbcc-navy)] hover:underline"
                     >
                       {stream.youtube_url}
                     </a>
@@ -156,7 +196,7 @@ export default async function AdminEnVivoPage() {
 
                   <Link
                     href={`/admin/en-vivo/${stream.id}/editar`}
-                    className="mt-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
+                    className="mt-2 rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
@@ -169,11 +209,20 @@ export default async function AdminEnVivoPage() {
         })}
 
         {liveStreams?.length === 0 && (
-          <div className="rounded-xl border bg-white px-5 py-12 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">
-            Aún no hay transmisiones registradas.
+          <div className="md:col-span-2 xl:col-span-3">
+            <AdminEmptyState
+              title="Aún no hay transmisiones registradas"
+              description="Crea una transmisión para gestionar videos y emisiones en vivo."
+              icon="stream"
+              action={
+                <AdminActionButton href="/admin/en-vivo/crear" icon="plus" tone="gold">
+                  Crear transmisión
+                </AdminActionButton>
+              }
+            />
           </div>
         )}
       </section>
-    </main>
+    </AdminPageShell>
   );
 }

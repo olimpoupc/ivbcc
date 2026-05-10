@@ -27,7 +27,7 @@ export default function DeleteQuizButton({ id }: Props) {
   return (
     <button
       onClick={handleDelete}
-      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+      className="rounded-full bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700"
     >
       Eliminar
     </button>

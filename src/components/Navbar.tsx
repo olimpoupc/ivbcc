@@ -375,6 +375,13 @@ export default function Navbar({
 
           <div className="flex items-center gap-3">
             <Link
+              href="/donaciones"
+              onClick={closeDropdowns}
+              className="rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:opacity-90"
+            >
+              $ Donar
+            </Link>
+            <Link
               href="/en-vivo"
               onClick={() => {
                 closeDropdowns();

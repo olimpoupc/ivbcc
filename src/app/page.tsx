@@ -708,6 +708,24 @@ export default async function Home() {
       ) : null}
 
       <section className="site-shell-wide py-12">
+        <div className="dark-panel grid gap-6 rounded-[30px] p-7 md:grid-cols-[1fr_auto] md:items-center md:p-9">
+          <div>
+            <p className="kicker">Generosidad</p>
+            <h2 className="section-title mt-3 text-4xl">
+              Apoya la misión de IVBCC
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-white/68">
+              Tu aporte ayuda a sostener espacios de adoración, formación,
+              servicio y acompañamiento para nuestra comunidad.
+            </p>
+          </div>
+          <Link href="/donaciones" className="btn-primary w-fit">
+            Donar ahora
+          </Link>
+        </div>
+      </section>
+
+      <section className="site-shell-wide py-12">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="premium-surface rounded-[30px] p-7 md:p-9">
             <p className="kicker">Nosotros</p>

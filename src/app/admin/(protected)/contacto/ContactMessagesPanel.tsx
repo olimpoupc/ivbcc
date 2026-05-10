@@ -3,6 +3,14 @@
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AuthFeedback from "@/components/AuthFeedback";
+import {
+  AdminEmptyState,
+  AdminPanelCard,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
+
+const contactMessageSelect =
+  "id,full_name,email,phone,church_name,subject,category,message,status,admin_response,responded_at,updated_at,created_at";
 
 type MessageStatus = "pending" | "read" | "responded" | "archived";
 type MessageCategory =
@@ -72,6 +80,13 @@ const categoryConfig: Record<MessageCategory, string> = {
 
 function getStatusConfig(status: MessageStatus) {
   return statusConfig[status] || statusConfig.pending;
+}
+
+function getStatusTone(status: MessageStatus) {
+  if (status === "pending") return "amber";
+  if (status === "read") return "blue";
+  if (status === "responded") return "green";
+  return "slate";
 }
 
 function escapeCsvValue(value: string) {
@@ -144,19 +159,6 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  const metrics = useMemo(() => {
-    const countByStatus = (status: MessageStatus) =>
-      messages.filter((message) => message.status === status).length;
-
-    return [
-      { label: "Total mensajes", value: messages.length },
-      { label: "Pendientes", value: countByStatus("pending") },
-      { label: "Leídos", value: countByStatus("read") },
-      { label: "Archivados", value: countByStatus("archived") },
-      { label: "Respondidos", value: countByStatus("responded") },
-    ];
-  }, [messages]);
-
   const filteredMessages = useMemo(() => {
     return messages.filter((message) => {
       const matchesQuery = normalizedQuery
@@ -215,7 +217,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
       .from("contact_messages")
       .update(values)
       .eq("id", id)
-      .select("*")
+      .select(contactMessageSelect)
       .maybeSingle();
 
     setIsSaving(false);
@@ -368,19 +370,10 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {metrics.map((metric) => (
-          <article key={metric.label} className="rounded-2xl bg-white p-5 shadow-sm">
-            <p className="text-3xl font-bold text-gray-950">{metric.value}</p>
-            <p className="mt-2 text-sm font-medium text-gray-500">{metric.label}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <AdminPanelCard>
         <div className="grid gap-4 xl:grid-cols-[1.2fr_0.7fr_0.8fr_auto]">
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-gray-700">
+            <span className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Buscar
             </span>
             <input
@@ -388,12 +381,12 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nombre, correo, teléfono, asunto o mensaje"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+              className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-gray-700">
+            <span className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Estado
             </span>
             <select
@@ -401,7 +394,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               onChange={(event) =>
                 setStatusFilter(event.target.value as "all" | MessageStatus)
               }
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+              className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm"
             >
               <option value="all">Todos</option>
               <option value="pending">Pendiente</option>
@@ -412,7 +405,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-gray-700">
+            <span className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Categoría
             </span>
             <select
@@ -420,7 +413,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               onChange={(event) =>
                 setCategoryFilter(event.target.value as "all" | MessageCategory)
               }
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+              className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm"
             >
               <option value="all">Todas</option>
               {Object.entries(categoryConfig).map(([value, label]) => (
@@ -435,29 +428,29 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
             <button
               type="button"
               onClick={handleExportCsv}
-              className="w-full rounded-xl bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              className="w-full rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--ivbcc-navy-2)]"
             >
               Exportar CSV
             </button>
           </div>
         </div>
-      </section>
+      </AdminPanelCard>
 
       <AuthFeedback type={feedback.type} message={feedback.message} />
 
       <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
-        <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <div className="border-b border-gray-100 p-5">
-            <h2 className="text-xl font-bold text-gray-950">Mensajes</h2>
-            <p className="mt-1 text-sm text-gray-500">
+        <AdminPanelCard className="overflow-hidden p-0">
+          <div className="border-b border-[var(--ivbcc-line)] p-5">
+            <h2 className="section-title text-xl text-[var(--ivbcc-ink)]">Mensajes</h2>
+            <p className="muted-copy mt-1 text-sm">
               {filteredMessages.length} mensaje(s) según los filtros actuales.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[980px] divide-y divide-gray-100 text-sm">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <table className="min-w-[980px] divide-y divide-[var(--ivbcc-line)] text-sm">
+              <thead className="bg-[var(--ivbcc-paper)]">
+                <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-[var(--ivbcc-muted)]">
                   <th className="px-5 py-3">Contacto</th>
                   <th className="px-5 py-3">Teléfono</th>
                   <th className="px-5 py-3">Categoría</th>
@@ -466,7 +459,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                   <th className="px-5 py-3">Fecha</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--ivbcc-line)] bg-white/70">
                 {filteredMessages.map((message) => {
                   const status = getStatusConfig(message.status);
                   const isSelected = message.id === activeSelectedMessageId;
@@ -474,8 +467,8 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                   return (
                     <tr
                       key={message.id}
-                      className={`cursor-pointer align-top transition hover:bg-slate-50 ${
-                        isSelected ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""
+                      className={`cursor-pointer align-top transition hover:bg-[var(--ivbcc-paper)] ${
+                        isSelected ? "bg-[rgba(201,162,74,0.1)] ring-1 ring-inset ring-[rgba(201,162,74,0.35)]" : ""
                       }`}
                       onClick={() => {
                         setSelectedMessageId(message.id);
@@ -496,32 +489,30 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                             aria-hidden="true"
                           />
                           <div>
-                            <p className="font-semibold text-gray-950">
+                            <p className="font-extrabold text-[var(--ivbcc-ink)]">
                               {message.full_name}
                             </p>
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 text-xs text-[var(--ivbcc-muted)]">
                               {message.email}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-gray-600">
+                      <td className="px-5 py-4 text-[var(--ivbcc-muted)]">
                         {message.phone || "Sin teléfono"}
                       </td>
-                      <td className="px-5 py-4 text-gray-600">
+                      <td className="px-5 py-4 text-[var(--ivbcc-muted)]">
                         {categoryConfig[message.category] || "Otro"}
                       </td>
-                      <td className="px-5 py-4 font-medium text-gray-800">
+                      <td className="px-5 py-4 font-semibold text-[var(--ivbcc-ink)]">
                         {message.subject}
                       </td>
                       <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${status.className}`}
-                        >
+                        <AdminStatusBadge tone={getStatusTone(message.status)}>
                           {status.label}
-                        </span>
+                        </AdminStatusBadge>
                       </td>
-                      <td className="px-5 py-4 text-gray-500">
+                      <td className="px-5 py-4 text-[var(--ivbcc-muted)]">
                         {message.created_at_label}
                       </td>
                     </tr>
@@ -532,33 +523,35 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
           </div>
 
           {filteredMessages.length === 0 && (
-            <p className="px-6 py-12 text-center text-sm text-gray-500">
-              No se encontraron mensajes con ese criterio.
-            </p>
+            <div className="p-6">
+              <AdminEmptyState
+                title="No hay mensajes para mostrar"
+                description="Ajusta los filtros o espera nuevos mensajes desde la página pública."
+                icon="message"
+              />
+            </div>
           )}
-        </article>
+        </AdminPanelCard>
 
-        <aside className="rounded-2xl bg-white p-6 shadow-sm">
+        <AdminPanelCard>
           {selectedMessage && selectedStatus ? (
             <div className="space-y-6">
-              <div className="flex flex-col gap-4 border-b border-gray-100 pb-5">
+              <div className="flex flex-col gap-4 border-b border-[var(--ivbcc-line)] pb-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${selectedStatus.className}`}
-                  >
+                  <AdminStatusBadge tone={getStatusTone(selectedMessage.status)}>
                     <span className={`h-2 w-2 rounded-full ${selectedStatus.dot}`} />
                     {selectedStatus.label}
-                  </span>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                  </AdminStatusBadge>
+                  <AdminStatusBadge tone="slate">
                     {categoryConfig[selectedMessage.category] || "Otro"}
-                  </span>
+                  </AdminStatusBadge>
                 </div>
 
                 <div>
-                  <h2 className="text-2xl font-bold leading-tight text-gray-950">
+                  <h2 className="section-title text-2xl leading-tight text-[var(--ivbcc-ink)]">
                     {selectedMessage.subject}
                   </h2>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="muted-copy mt-2 text-sm">
                     Recibido el {selectedMessage.created_at_label}
                   </p>
                 </div>
@@ -578,17 +571,17 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <p className="kicker">
                   Mensaje completo
                 </p>
-                <div className="mt-2 whitespace-pre-line rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-gray-700">
+                <div className="mt-2 whitespace-pre-line rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4 text-sm leading-6 text-[var(--ivbcc-muted)]">
                   {selectedMessage.message}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
-                <p className="text-sm font-bold text-gray-950">Acciones rápidas</p>
-                <p className="mt-1 text-xs leading-5 text-gray-600">
+              <div className="rounded-2xl border border-[rgba(201,162,74,0.28)] bg-[rgba(201,162,74,0.1)] p-4">
+                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">Acciones rápidas</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--ivbcc-muted)]">
                   Estas acciones abren herramientas externas o copian datos. No
                   envían correos automáticamente desde IVBCC.
                 </p>
@@ -596,7 +589,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <a
                     href={mailtoHref}
-                    className="rounded-xl bg-[var(--ivbcc-navy)] px-4 py-3 text-center text-sm font-semibold text-white transition hover:opacity-90"
+                    className="rounded-full bg-[var(--ivbcc-navy)] px-4 py-3 text-center text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
                   >
                     Responder por correo
                   </a>
@@ -605,7 +598,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                       href={whatsappHref}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      className="rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-extrabold text-white transition hover:bg-emerald-700"
                     >
                       Responder por WhatsApp
                     </a>
@@ -613,7 +606,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                     <button
                       type="button"
                       disabled
-                      className="rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-400"
+                      className="rounded-full bg-gray-100 px-4 py-3 text-sm font-extrabold text-gray-400"
                     >
                       Sin WhatsApp
                     </button>
@@ -621,7 +614,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                   <button
                     type="button"
                     onClick={() => copyToClipboard(selectedMessage.email, "Correo")}
-                    className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="rounded-full border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm font-extrabold text-[var(--ivbcc-ink)] transition hover:bg-[var(--ivbcc-paper)]"
                   >
                     Copiar correo
                   </button>
@@ -631,7 +624,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                       copyToClipboard(selectedMessage.phone, "Teléfono")
                     }
                     disabled={!selectedMessage.phone}
-                    className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400"
+                    className="rounded-full border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm font-extrabold text-[var(--ivbcc-ink)] transition hover:bg-[var(--ivbcc-paper)] disabled:bg-gray-50 disabled:text-gray-400"
                   >
                     Copiar teléfono
                   </button>
@@ -680,17 +673,17 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               </div>
 
               <div className="border-t border-gray-100 pt-6">
-                <p className="text-sm font-bold text-gray-950">
+                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
                   Nota interna / seguimiento
                 </p>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="muted-copy mt-1 text-sm">
                   Esta nota queda guardada para el equipo administrativo. No
                   envía correo automáticamente.
                 </p>
 
                 {selectedMessage.admin_response ? (
-                  <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <div className="mt-4 rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4">
+                    <p className="kicker">
                       Última nota guardada
                     </p>
                     <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-700">
@@ -716,7 +709,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                     })
                   }
                   rows={5}
-                  className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]"
+                  className="mt-4 w-full rounded-2xl border border-[var(--ivbcc-line)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
                   placeholder="Escribe una nota de seguimiento para el equipo..."
                 />
 
@@ -731,7 +724,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                     type="button"
                     onClick={handleSaveNote}
                     disabled={isSaving}
-                    className="rounded-xl bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                    className="rounded-full bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-navy)] transition hover:opacity-90 disabled:opacity-60"
                   >
                     Guardar nota interna
                   </button>
@@ -739,11 +732,13 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-gray-500">
-              Selecciona un mensaje para ver su detalle y acciones.
-            </div>
+            <AdminEmptyState
+              title="Selecciona un mensaje"
+              description="El detalle, las acciones rápidas y la nota interna aparecerán aquí."
+              icon="message"
+            />
           )}
-        </aside>
+        </AdminPanelCard>
       </section>
     </div>
   );
@@ -751,11 +746,11 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+    <div className="rounded-2xl border border-[var(--ivbcc-line)] bg-white/80 p-4">
+      <p className="kicker">
         {label}
       </p>
-      <p className="mt-1 break-words text-sm font-medium text-gray-800">
+      <p className="mt-1 break-words text-sm font-semibold text-[var(--ivbcc-ink)]">
         {value}
       </p>
     </div>

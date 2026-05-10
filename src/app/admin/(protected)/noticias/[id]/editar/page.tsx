@@ -8,6 +8,21 @@ import {
   buildSafeStoragePath,
   validateImageFile,
 } from "@/lib/security";
+import {
+  AdminActionButton,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  adminFileInputClass,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type NewsStatus = "published" | "scheduled" | "draft";
 
@@ -70,7 +85,7 @@ export default function EditarNoticiaPage() {
     async function loadNews() {
       const { data, error } = await supabase
         .from("news")
-        .select("*")
+        .select("id,title,slug,summary,content,image_url,status,published_at,expires_at")
         .eq("id", id)
         .maybeSingle();
 
@@ -233,96 +248,81 @@ export default function EditarNoticiaPage() {
   }
 
   if (isLoading) {
-    return <main className="text-sm text-gray-500">Cargando noticia...</main>;
+    return <AdminPageShell><AdminPanelCard>Cargando noticia...</AdminPanelCard></AdminPageShell>;
   }
 
   if (!noticia) {
-    return <main className="text-sm text-gray-500">Noticia no encontrada.</main>;
+    return <AdminPageShell><AdminPanelCard>Noticia no encontrada.</AdminPanelCard></AdminPageShell>;
   }
 
   return (
-    <main>
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Editar noticia</h1>
-          <p className="mt-1 text-gray-500">
-            Actualiza la información, estado, fechas e imagen de la noticia.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => router.push("/admin/noticias")}
-          className="w-fit rounded-lg border px-5 py-2 font-semibold text-gray-700"
-        >
-          Volver a noticias
-        </button>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Contenido editorial"
+        title="Editar noticia"
+        subtitle="Actualiza la información, estado, fechas e imagen de la noticia."
+        icon="news"
+        actions={
+          <AdminActionButton href="/admin/noticias" icon="arrow" tone="outline">
+            Volver a noticias
+          </AdminActionButton>
+        }
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Título
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-2">
+        <AdminFormField label="Título">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Slug
-          </label>
+        <AdminFormField label="Slug">
           <input
             type="text"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
+        </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Resumen
-          </label>
+        <AdminFormField label="Resumen">
           <textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             required
             rows={3}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Contenido
-          </label>
+        <AdminFormField label="Contenido">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             required
             rows={8}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
+        <AdminPanelCard>
         <div className="grid gap-5 lg:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Imagen actual
-            </label>
+          <AdminFormField label="Imagen actual">
 
             {noticia.image_url ? (
-              <div className="relative h-56 overflow-hidden rounded-lg bg-gray-100">
+              <div className="relative h-56 overflow-hidden rounded-[24px] bg-[var(--ivbcc-paper)]">
                 <Image
                   src={noticia.image_url}
                   alt={noticia.title}
@@ -332,23 +332,21 @@ export default function EditarNoticiaPage() {
                 />
               </div>
             ) : (
-              <div className="flex h-56 items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400">
+              <div className="flex h-56 items-center justify-center rounded-[24px] bg-[var(--ivbcc-paper)] text-sm font-semibold text-[var(--ivbcc-muted)]">
                 Sin imagen actual
               </div>
             )}
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Nueva imagen
-            </label>
+          <AdminFormField label="Nueva imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
             <input
               ref={imageInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleImageChange}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminFileInputClass}
             />
+          </AdminFormField>
 
             {imagePreviewUrl && (
               <div className="mt-4">
@@ -358,27 +356,25 @@ export default function EditarNoticiaPage() {
                   width={640}
                   height={256}
                   unoptimized
-                  className="max-h-56 w-full rounded-lg object-cover"
+                  className="max-h-56 w-full rounded-[24px] object-cover"
                 />
 
                 <button
                   type="button"
                   onClick={handleRemoveNewImage}
-                  className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700"
+                  className={`${adminSecondaryButtonClass} mt-3`}
                 >
                   Quitar nueva imagen
                 </button>
               </div>
             )}
-          </div>
         </div>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-3 block text-sm font-semibold text-gray-700">
-            Estado
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Estado">
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "published"}>
               <input
                 type="radio"
                 name="status"
@@ -387,9 +383,9 @@ export default function EditarNoticiaPage() {
                 onChange={() => handleStatusChange("published")}
               />
               Publicada
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "scheduled"}>
               <input
                 type="radio"
                 name="status"
@@ -398,9 +394,9 @@ export default function EditarNoticiaPage() {
                 onChange={() => handleStatusChange("scheduled")}
               />
               Programada
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "draft"}>
               <input
                 type="radio"
                 name="status"
@@ -409,42 +405,37 @@ export default function EditarNoticiaPage() {
                 onChange={() => handleStatusChange("draft")}
               />
               Borrador
-            </label>
+            </AdminRadioCard></label>
           </div>
-        </div>
+        </AdminFormField>
 
         {status === "scheduled" && (
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Fecha de publicación
-            </label>
+          <AdminFormField label="Fecha de publicación">
             <input
               type="datetime-local"
               value={publishedAt}
               onChange={(e) => setPublishedAt(e.target.value)}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         )}
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Fecha de vencimiento
-          </label>
+        <AdminFormField label="Fecha de vencimiento">
           <input
             type="datetime-local"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push("/admin/noticias")}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -452,12 +443,12 @@ export default function EditarNoticiaPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

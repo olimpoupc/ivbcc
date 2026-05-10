@@ -33,7 +33,7 @@ export default function PublishNewsButton({ id }: Props) {
   return (
     <button
       onClick={handlePublish}
-      className="bg-green-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-green-700"
+      className="rounded-full bg-green-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-green-700"
     >
       Publicar
     </button>

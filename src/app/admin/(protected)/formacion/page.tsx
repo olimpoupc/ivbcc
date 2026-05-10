@@ -2,49 +2,80 @@ import Image from "next/image";
 import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import DeleteCourseButton from "./DeleteCourseButton";
 import PublishCourseButton from "./PublishCourseButton";
 
 const statusConfig = {
   published: {
     label: "Publicado",
-    className: "bg-green-50 text-green-700 border-green-200",
+    tone: "green",
   },
   draft: {
     label: "Borrador",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    tone: "amber",
   },
-};
+} as const;
+
+const courseSelect = "id,title,slug,description,image_url,status,created_at";
 
 export default async function AdminFormacionPage() {
   const supabase = await createSupabaseServerClient();
   const { data: courses } = await supabase
     .from("courses")
-    .select("*")
+    .select(courseSelect)
     .order("created_at", { ascending: false });
 
-  return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Administración
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Administrar cursos
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-500">
-            Gestiona cursos publicados y borradores para el módulo de formación.
-          </p>
-        </div>
+  const publishedCount =
+    courses?.filter((course) => (course.status || "draft") === "published").length ||
+    0;
+  const draftCount =
+    courses?.filter((course) => (course.status || "draft") === "draft").length || 0;
 
-        <Link
-          href="/admin/formacion/crear"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-        >
-          + Crear curso
-        </Link>
-      </div>
+  return (
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Administración"
+        title="Administrar cursos"
+        subtitle="Gestiona cursos publicados y borradores para el módulo de formación."
+        icon="book"
+        actions={
+          <AdminActionButton href="/admin/formacion/crear" icon="plus" tone="gold">
+            Crear curso
+          </AdminActionButton>
+        }
+      />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          label="Cursos totales"
+          value={courses?.length || 0}
+          detail="Programas registrados"
+          icon="book"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Publicados"
+          value={publishedCount}
+          detail="Disponibles para alumnos"
+          icon="check"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Borradores"
+          value={draftCount}
+          detail="En preparación"
+          icon="file"
+          tone="navy"
+        />
+      </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {courses?.map((course, index) => {
@@ -56,9 +87,9 @@ export default async function AdminFormacionPage() {
           return (
             <article
               key={course.id}
-              className="overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="premium-surface overflow-hidden rounded-[24px] transition hover:-translate-y-0.5 hover:shadow-xl"
             >
-              <div className="relative h-44 bg-gray-100">
+              <div className="relative h-44 bg-[var(--ivbcc-paper)]">
                 {course.image_url ? (
                   <Image
                     src={course.image_url}
@@ -76,22 +107,22 @@ export default async function AdminFormacionPage() {
                   />
                 )}
 
-                <span
-                  className={`absolute left-4 top-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${currentStatus.className}`}
-                >
-                  {currentStatus.label}
+                <span className="absolute left-4 top-4">
+                  <AdminStatusBadge tone={currentStatus.tone}>
+                    {currentStatus.label}
+                  </AdminStatusBadge>
                 </span>
               </div>
 
               <div className="flex min-h-64 flex-col p-5">
                 <div className="flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="kicker">
                     {course.slug}
                   </p>
-                  <h2 className="mt-2 line-clamp-2 text-lg font-bold leading-tight text-gray-950">
+                  <h2 className="section-title mt-2 line-clamp-2 text-lg leading-tight text-[var(--ivbcc-ink)]">
                     {course.title}
                   </h2>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-500">
+                  <p className="muted-copy mt-3 line-clamp-3 text-sm leading-6">
                     {course.description}
                   </p>
                 </div>
@@ -103,25 +134,25 @@ export default async function AdminFormacionPage() {
 
                   <Link
                     href={`/admin/formacion/${course.id}/quizzes`}
-                    className="mt-2 rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                    className="mt-2 rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
                   >
                     Ver quizzes
                   </Link>
                   <Link
                     href={`/admin/formacion/${course.id}/lecciones`}
-                    className="mt-2 rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                    className="mt-2 rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
                   >
                     Ver lecciones
                   </Link>
                   <Link
                     href={`/admin/certificados?course=${course.id}`}
-                    className="mt-2 rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+                    className="mt-2 rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
                   >
                     Ver certificados emitidos
                   </Link>
                   <Link
                     href={`/admin/formacion/${course.id}/editar`}
-                    className="mt-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
+                    className="mt-2 rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
@@ -133,11 +164,20 @@ export default async function AdminFormacionPage() {
         })}
 
         {courses?.length === 0 && (
-          <div className="rounded-xl border bg-white px-5 py-12 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">
-            Aún no hay cursos registrados.
+          <div className="md:col-span-2 xl:col-span-3">
+            <AdminEmptyState
+              title="Aún no hay cursos registrados"
+              description="Crea el primer curso para el módulo de formación."
+              icon="book"
+              action={
+                <AdminActionButton href="/admin/formacion/crear" icon="plus" tone="gold">
+                  Crear curso
+                </AdminActionButton>
+              }
+            />
           </div>
         )}
       </section>
-    </main>
+    </AdminPageShell>
   );
 }

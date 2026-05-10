@@ -340,6 +340,93 @@ select {
   box-shadow: var(--ivbcc-shadow);
 }
 
+.admin-premium main > .mb-8:first-child,
+.admin-premium main > .mb-8.flex:first-child {
+  border: 1px solid rgba(232, 226, 214, 0.86);
+  border-radius: var(--ivbcc-radius);
+  background: var(--ivbcc-card);
+  box-shadow: var(--ivbcc-shadow-soft);
+  backdrop-filter: blur(18px);
+  padding: 1.5rem;
+}
+
+.admin-premium main > .mb-8:first-child h1,
+.admin-premium main > .mb-8.flex:first-child h1 {
+  font-family: var(--font-outfit), var(--font-inter), Arial, Helvetica, sans-serif;
+  color: var(--ivbcc-ink);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.admin-premium main > .mb-8:first-child p,
+.admin-premium main > .mb-8.flex:first-child p {
+  color: var(--ivbcc-muted);
+  line-height: 1.75;
+}
+
+.admin-premium form.rounded-xl,
+.admin-premium form.bg-white,
+.admin-premium section.rounded-xl {
+  border: 1px solid rgba(232, 226, 214, 0.86);
+  border-radius: 24px;
+  background: var(--ivbcc-card);
+  box-shadow: var(--ivbcc-shadow-soft);
+  backdrop-filter: blur(18px);
+}
+
+.admin-premium form label:not(:has(input[type="radio"])):not(:has(input[type="checkbox"])) {
+  color: var(--ivbcc-ink);
+  font-weight: 800;
+}
+
+.admin-premium form input:not([type="radio"]):not([type="checkbox"]),
+.admin-premium form textarea,
+.admin-premium form select {
+  min-height: 3rem;
+  border-radius: 18px;
+  border-color: rgba(232, 226, 214, 0.94);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ivbcc-ink);
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.admin-premium form input:not([type="radio"]):not([type="checkbox"]):focus,
+.admin-premium form textarea:focus,
+.admin-premium form select:focus {
+  border-color: rgba(201, 162, 74, 0.78);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(201, 162, 74, 0.16);
+}
+
+.admin-premium form input[type="file"] {
+  padding: 0.62rem 1rem;
+}
+
+.admin-premium form label:has(input[type="radio"]),
+.admin-premium form label:has(input[type="checkbox"]) {
+  border-color: rgba(232, 226, 214, 0.94);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ivbcc-ink);
+  font-weight: 800;
+}
+
+.admin-premium form input[type="radio"],
+.admin-premium form input[type="checkbox"] {
+  accent-color: var(--ivbcc-gold);
+}
+
+.admin-premium form button,
+.admin-premium form a.rounded-lg {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
 @media (max-width: 768px) {
   .site-shell,
   .site-shell-wide {

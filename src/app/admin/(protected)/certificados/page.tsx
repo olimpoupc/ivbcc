@@ -5,6 +5,16 @@ import {
   formatCertificateDate,
 } from "@/lib/certificates";
 import { buildCourseProgressState } from "@/lib/course-progress";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+  AdminSection,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import RevokeCertificateButton from "./RevokeCertificateButton";
 
 type Props = {
@@ -38,7 +48,16 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
   const { data: certificates, error } = await certificatesQuery;
 
   if (error) {
-    return <main className="p-10">Error cargando certificados.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Formación"
+          title="Certificados emitidos"
+          subtitle="No fue posible cargar los certificados."
+          icon="certificate"
+        />
+      </AdminPageShell>
+    );
   }
 
   const totalCertificates = certificates?.length || 0;
@@ -162,27 +181,27 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
   }
 
   return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Formación
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Certificados emitidos
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Consulta certificados, enlaces de verificación y estado de emisión.
-          </p>
-        </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Formación"
+        title="Certificados emitidos"
+        subtitle="Consulta certificados, enlaces de verificación y estado de emisión."
+        icon="certificate"
+        actions={
+          <AdminActionButton href="/certificados" icon="external" tone="outline" external>
+            Verificador público
+          </AdminActionButton>
+        }
+      />
 
-        <form className="rounded-xl border bg-white p-4 shadow-sm">
-          <label className="text-sm font-semibold text-gray-700">
+      <AdminPanelCard>
+        <form className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <label className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
             Filtrar por curso
             <select
               name="course"
               defaultValue={selectedCourseId}
-              className="mt-2 w-full rounded-lg border px-4 py-2"
+              className="mt-2 w-full min-w-72 rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
             >
               <option value="all">Todos los cursos</option>
               {(courses || []).map((course) => (
@@ -194,72 +213,80 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
           </label>
           <button
             type="submit"
-            className="mt-3 rounded-lg bg-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-white"
+            className="rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[var(--ivbcc-navy-2)]"
           >
             Aplicar filtro
           </button>
         </form>
-      </div>
+      </AdminPanelCard>
 
-      <section className="grid gap-4 md:grid-cols-5">
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-gray-500">Total certificados</p>
-          <p className="mt-2 text-3xl font-bold text-gray-950">
-            {totalCertificates}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-gray-500">Válidos</p>
-          <p className="mt-2 text-3xl font-bold text-green-700">
-            {validCertificates}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-gray-500">Revocados</p>
-          <p className="mt-2 text-3xl font-bold text-red-700">
-            {revokedCertificates}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-gray-500">Cursos terminados</p>
-          <p className="mt-2 text-3xl font-bold text-[var(--ivbcc-navy)]">
-            {completedCourses}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-gray-500">Terminados sin certificado</p>
-          <p className="mt-2 text-3xl font-bold text-amber-700">
-            {completedWithoutCertificate.length}
-          </p>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <AdminMetricCard
+          label="Total certificados"
+          value={totalCertificates}
+          detail="Emitidos en el sistema"
+          icon="certificate"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Válidos"
+          value={validCertificates}
+          detail="Disponibles para verificar"
+          icon="check"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Revocados"
+          value={revokedCertificates}
+          detail="Sin validez pública"
+          icon="close"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Cursos terminados"
+          value={completedCourses}
+          detail="Con avance completado"
+          icon="book"
+          tone="navy"
+        />
+        <AdminMetricCard
+          label="Sin certificado"
+          value={completedWithoutCertificate.length}
+          detail="Pendientes de emisión"
+          icon="activity"
+          tone="gold"
+        />
       </section>
 
       {completedWithoutCertificate.length ? (
-        <section className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-gray-950">
-            Usuarios que terminaron curso sin certificado emitido
-          </h2>
+        <AdminSection
+          title="Terminados sin certificado"
+          subtitle="Usuarios que terminaron un curso y aún no tienen certificado emitido."
+          icon="activity"
+        >
+          <AdminPanelCard>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {completedWithoutCertificate.map((item) => (
               <div
                 key={`${item.userId}-${item.courseId}`}
-                className="rounded-lg bg-amber-50 p-4 text-sm"
+                className="rounded-2xl border border-[rgba(201,162,74,0.28)] bg-[rgba(201,162,74,0.1)] p-4 text-sm"
               >
-                <p className="font-bold text-gray-950">{item.studentName}</p>
-                <p className="mt-1 text-gray-600">{item.courseTitle}</p>
+                <p className="font-extrabold text-[var(--ivbcc-ink)]">{item.studentName}</p>
+                <p className="mt-1 text-[var(--ivbcc-muted)]">{item.courseTitle}</p>
               </div>
             ))}
           </div>
-        </section>
+          </AdminPanelCard>
+        </AdminSection>
       ) : null}
 
-      <section className="rounded-xl bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-gray-950">Certificados por curso</h2>
+      <AdminSection title="Certificados por curso" icon="book">
+        <AdminPanelCard>
         {certificatesByCourse.size ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {Array.from(certificatesByCourse.entries()).map(([courseTitle, total]) => (
-              <div key={courseTitle} className="rounded-lg bg-gray-50 p-4">
-                <p className="line-clamp-2 text-sm font-semibold text-gray-700">
+              <div key={courseTitle} className="rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4">
+                <p className="line-clamp-2 text-sm font-extrabold text-[var(--ivbcc-ink)]">
                   {courseTitle}
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[var(--ivbcc-navy)]">
@@ -269,21 +296,25 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-gray-500">
-            Sin certificados para el filtro actual.
-          </p>
+          <AdminEmptyState
+            title="Sin certificados para el filtro actual"
+            description="Cambia el curso seleccionado o espera nuevas emisiones."
+            icon="certificate"
+          />
         )}
-      </section>
+        </AdminPanelCard>
+      </AdminSection>
 
-      <section className="overflow-hidden rounded-xl bg-white shadow-sm">
-        <div className="grid grid-cols-12 border-b bg-gray-50 px-5 py-3 text-sm font-semibold text-gray-600">
-          <div className="col-span-2">Estudiante</div>
-          <div className="col-span-2">Curso</div>
-          <div className="col-span-2">Código</div>
-          <div className="col-span-2">Emisión</div>
-          <div className="col-span-1">Estado</div>
-          <div className="col-span-3 text-right">Acciones</div>
-        </div>
+      <AdminSection title="Listado de certificados" icon="certificate">
+        <AdminPanelCard className="overflow-hidden p-0">
+          <div className="hidden grid-cols-12 border-b border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-muted)] lg:grid">
+            <div className="col-span-2">Estudiante</div>
+            <div className="col-span-2">Curso</div>
+            <div className="col-span-2">Código</div>
+            <div className="col-span-2">Emisión</div>
+            <div className="col-span-1">Estado</div>
+            <div className="col-span-3 text-right">Acciones</div>
+          </div>
 
         {certificates?.length ? (
           certificates.map((certificate) => {
@@ -295,37 +326,31 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
             return (
               <article
                 key={certificate.id}
-                className="grid grid-cols-12 items-center gap-3 border-b px-5 py-4 text-sm"
+                className="grid gap-3 border-b border-[var(--ivbcc-line)] px-5 py-4 text-sm lg:grid-cols-12 lg:items-center"
               >
-                <div className="col-span-2 font-semibold text-gray-900">
+                <div className="font-extrabold text-[var(--ivbcc-ink)] lg:col-span-2">
                   {certificate.student_name}
                 </div>
-                <div className="col-span-2 text-gray-700">
+                <div className="text-[var(--ivbcc-muted)] lg:col-span-2">
                   {certificate.course_title}
                 </div>
-                <div className="col-span-2 break-all font-mono text-xs font-semibold text-gray-700">
+                <div className="break-all font-mono text-xs font-semibold text-[var(--ivbcc-muted)] lg:col-span-2">
                   {certificate.code}
                 </div>
-                <div className="col-span-2 text-gray-600">
+                <div className="text-[var(--ivbcc-muted)] lg:col-span-2">
                   {formatCertificateDate(certificate.issued_at)}
                 </div>
-                <div className="col-span-1">
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                      isValid
-                        ? "border-green-200 bg-green-50 text-green-700"
-                        : "border-red-200 bg-red-50 text-red-700"
-                    }`}
-                  >
+                <div className="lg:col-span-1">
+                  <AdminStatusBadge tone={isValid ? "green" : "red"}>
                     {isValid ? "Válido" : "Revocado"}
-                  </span>
+                  </AdminStatusBadge>
                 </div>
-                <div className="col-span-3 flex flex-wrap justify-end gap-2">
+                <div className="flex flex-wrap gap-2 lg:col-span-3 lg:justify-end">
                   <Link
                     href={verificationUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    className="rounded-full border border-[var(--ivbcc-line)] bg-white px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-ink)] transition hover:bg-[var(--ivbcc-paper)]"
                   >
                     Verificar
                   </Link>
@@ -338,11 +363,16 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
             );
           })
         ) : (
-          <div className="px-5 py-12 text-center text-sm text-gray-500">
-            Aún no hay certificados emitidos.
+          <div className="p-6">
+            <AdminEmptyState
+              title="Aún no hay certificados emitidos"
+              description="Cuando un estudiante complete su formación, los certificados aparecerán aquí."
+              icon="certificate"
+            />
           </div>
         )}
-      </section>
-    </main>
+        </AdminPanelCard>
+      </AdminSection>
+    </AdminPageShell>
   );
 }

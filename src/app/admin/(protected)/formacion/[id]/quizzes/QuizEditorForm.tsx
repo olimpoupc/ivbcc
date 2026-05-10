@@ -3,6 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { AdminPanelCard } from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSelectClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type QuizStatus = "draft" | "published";
 
@@ -90,7 +100,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
 
       const { data: quizData, error: quizError } = await supabase
         .from("quizzes")
-        .select("*")
+        .select("id,title,status,lesson_id")
         .eq("id", quizId)
         .eq("course_id", courseId)
         .maybeSingle();
@@ -110,7 +120,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
 
       const { data: questionsData, error: questionsError } = await supabase
         .from("quiz_questions")
-        .select("*")
+        .select("id,question_text,order")
         .eq("quiz_id", quizId)
         .order("order", { ascending: true });
 
@@ -128,7 +138,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
         questionIds.length > 0
           ? await supabase
               .from("quiz_options")
-              .select("*")
+              .select("id,question_id,option_text,is_correct,order")
               .in("question_id", questionIds)
               .order("order", { ascending: true })
           : { data: [], error: null };
@@ -412,34 +422,30 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
   }
 
   if (isLoading) {
-    return <main className="text-sm text-gray-500">Cargando quiz...</main>;
+    return <AdminPanelCard>Cargando quiz...</AdminPanelCard>;
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-6 rounded-xl border bg-white p-6 shadow-sm"
+      className="space-y-6"
     >
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-gray-700">
-          Título del quiz
-        </label>
+      <AdminPanelCard className="space-y-5">
+      <AdminFormField label="Título del quiz">
         <input
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           required
-          className="w-full rounded-lg border px-4 py-2"
+          className={adminInputClass}
         />
-      </div>
+      </AdminFormField>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Estado
-          </label>
+        <AdminFormField label="Estado">
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label>
+              <AdminRadioCard checked={status === "draft"}>
               <input
                 type="radio"
                 name="status"
@@ -448,9 +454,11 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                 onChange={() => setStatus("draft")}
               />
               Borrador
+              </AdminRadioCard>
             </label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label>
+              <AdminRadioCard checked={status === "published"}>
               <input
                 type="radio"
                 name="status"
@@ -459,18 +467,16 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                 onChange={() => setStatus("published")}
               />
               Publicado
+              </AdminRadioCard>
             </label>
           </div>
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Lección asociada
-          </label>
+        <AdminFormField label="Lección asociada">
           <select
             value={lessonId}
             onChange={(event) => setLessonId(event.target.value)}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminSelectClass}
           >
             <option value="">Quiz general del curso</option>
             {lessons.map((lesson) => (
@@ -479,16 +485,17 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
               </option>
             ))}
           </select>
-        </div>
+        </AdminFormField>
       </div>
+      </AdminPanelCard>
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-950">Preguntas</h2>
+          <h2 className="section-title text-2xl text-[var(--ivbcc-ink)]">Preguntas</h2>
           <button
             type="button"
             onClick={addQuestion}
-            className="rounded-lg border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-semibold text-[var(--ivbcc-navy)] hover:bg-[var(--ivbcc-navy)] hover:text-white"
+            className={adminSecondaryButtonClass}
           >
             + Agregar pregunta
           </button>
@@ -497,16 +504,16 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
         {questions.map((question, questionIndex) => (
           <article
             key={question.localId}
-            className="space-y-4 rounded-xl border bg-gray-50 p-5"
+            className="premium-surface space-y-4 rounded-[24px] p-5"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-gray-950">
+              <h3 className="section-title text-lg text-[var(--ivbcc-ink)]">
                 Pregunta {questionIndex + 1}
               </h3>
               <button
                 type="button"
                 onClick={() => removeQuestion(question.localId)}
-                className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white"
+                className={adminSecondaryButtonClass}
               >
                 Eliminar pregunta
               </button>
@@ -528,7 +535,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                   }
                   required
                   rows={3}
-                  className="w-full rounded-lg border px-4 py-2"
+                  className={adminTextareaClass}
                 />
               </div>
 
@@ -547,18 +554,18 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                       Number(event.target.value)
                     )
                   }
-                  className="w-full rounded-lg border px-4 py-2"
+                  className={adminInputClass}
                 />
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-700">Opciones</p>
+                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">Opciones</p>
                 <button
                   type="button"
                   onClick={() => addOption(question.localId)}
-                  className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white"
+                  className={adminSecondaryButtonClass}
                 >
                   + Agregar opción
                 </button>
@@ -567,7 +574,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
               {question.options.map((option, optionIndex) => (
                 <div
                   key={option.localId}
-                  className="grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-[1fr_110px_160px_auto]"
+                  className="grid gap-3 rounded-2xl border border-[var(--ivbcc-line)] bg-white/80 p-4 md:grid-cols-[1fr_110px_160px_auto]"
                 >
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -585,7 +592,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                         )
                       }
                       required
-                      className="w-full rounded-lg border px-4 py-2"
+                      className={adminInputClass}
                     />
                   </div>
 
@@ -605,11 +612,11 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                           Number(event.target.value)
                         )
                       }
-                      className="w-full rounded-lg border px-4 py-2"
+                      className={adminInputClass}
                     />
                   </div>
 
-                  <label className="flex items-center gap-2 self-end rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700">
+                  <label className="flex min-h-12 items-center gap-2 self-end rounded-2xl border border-[var(--ivbcc-line)] bg-white/75 px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-ink)]">
                     <input
                       type="radio"
                       name={`correct-option-${question.localId}`}
@@ -631,7 +638,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                     onClick={() =>
                       removeOption(question.localId, option.localId)
                     }
-                    className="self-end rounded-lg border px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className={`${adminSecondaryButtonClass} self-end`}
                   >
                     Eliminar
                   </button>
@@ -646,7 +653,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
         <button
           type="button"
           onClick={() => router.push(`/admin/formacion/${courseId}/quizzes`)}
-          className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+          className={adminSecondaryButtonClass}
         >
           Cancelar
         </button>
@@ -654,7 +661,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           {isSubmitting
             ? "Guardando..."

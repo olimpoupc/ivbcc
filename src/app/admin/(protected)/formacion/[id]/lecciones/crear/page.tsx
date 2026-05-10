@@ -8,6 +8,19 @@ import {
   buildSafeStoragePath,
   validateDocumentFile,
 } from "@/lib/security";
+import {
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  adminFileInputClass,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 const allowedMaterialTypes = ["application/pdf"];
 
@@ -157,90 +170,79 @@ export default function CrearLeccionPage() {
   }
 
   return (
-    <main>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Crear lección</h1>
-        <p className="mt-1 text-gray-500">
-          Agrega una nueva lección al curso seleccionado.
-        </p>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Formación IVBCC"
+        title="Crear lección"
+        subtitle="Agrega una nueva lección al curso seleccionado."
+        icon="book"
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Título
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Título">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Contenido
-          </label>
+        <AdminFormField label="Contenido">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             required
             rows={8}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            URL de video de YouTube
-          </label>
+        <AdminFormField label="URL de video de YouTube">
           <input
             type="url"
             value={videoUrl}
             onChange={(e) => setVideoUrl(e.target.value)}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Material PDF
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Material PDF" hint="Solo se permite PDF.">
           <input
             type="file"
             accept="application/pdf"
             onChange={handleMaterialChange}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminFileInputClass}
           />
-        </div>
+        </AdminFormField>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Orden
-          </label>
+        <AdminFormField
+          label="Orden"
+          hint="Se asignó automáticamente el siguiente orden disponible."
+        >
           <input
             type="number"
             min="1"
             value={order}
             onChange={(e) => setOrder(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminInputClass}
           />
-          <p className="mt-2 text-sm text-gray-500">
-            Se asignó automáticamente el siguiente orden disponible.
-          </p>
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push(`/admin/formacion/${courseId}/lecciones`)}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -248,12 +250,12 @@ export default function CrearLeccionPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar lección"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

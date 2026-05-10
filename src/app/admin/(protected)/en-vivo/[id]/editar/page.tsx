@@ -3,6 +3,22 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  AdminActionButton,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
+import {
+  AdminFormField,
+  AdminRadioCard,
+  AdminToggleCard,
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSelectClass,
+  adminTextareaClass,
+} from "@/components/admin/AdminFormPrimitives";
 
 type LiveStreamStatus = "draft" | "published";
 type LiveStreamCategory =
@@ -102,7 +118,7 @@ export default function EditarTransmisionPage() {
     async function loadLiveStream() {
       const { data, error } = await supabase
         .from("live_streams")
-        .select("*")
+        .select("id,title,slug,description,youtube_url,thumbnail_url,category,is_live,featured,status,scheduled_at,ends_at")
         .eq("id", id)
         .maybeSingle();
 
@@ -181,115 +197,94 @@ export default function EditarTransmisionPage() {
   }
 
   if (isLoading) {
-    return <main className="text-sm text-gray-500">Cargando transmisión...</main>;
+    return <AdminPageShell><AdminPanelCard>Cargando transmisión...</AdminPanelCard></AdminPageShell>;
   }
 
   if (!liveStream) {
-    return <main className="text-sm text-gray-500">Transmisión no encontrada.</main>;
+    return <AdminPageShell><AdminPanelCard>Transmisión no encontrada.</AdminPanelCard></AdminPageShell>;
   }
 
   return (
-    <main>
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Editar transmisión</h1>
-          <p className="mt-1 text-gray-500">
-            Actualiza la información, visibilidad y programación de la
-            transmisión.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => router.push("/admin/en-vivo")}
-          className="w-fit rounded-lg border px-5 py-2 font-semibold text-gray-700"
-        >
-          Volver a transmisiones
-        </button>
-      </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Streaming y multimedia"
+        title="Editar transmisión"
+        subtitle="Actualiza la información, visibilidad y programación de la transmisión."
+        icon="stream"
+        actions={
+          <AdminActionButton href="/admin/en-vivo" icon="arrow" tone="outline">
+            Volver a transmisiones
+          </AdminActionButton>
+        }
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-xl border bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Título
-            </label>
+          <AdminFormField label="Título">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Slug
-            </label>
+          <AdminFormField label="Slug">
             <input
               type="text"
               value={slug}
               onChange={(e) => setSlug(normalizeSlug(e.target.value))}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-700">
-            Descripción
-          </label>
+        <AdminFormField label="Descripción">
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={6}
-            className="w-full rounded-lg border px-4 py-2"
+            className={adminTextareaClass}
           />
-        </div>
+        </AdminFormField>
+        </AdminPanelCard>
 
+        <AdminPanelCard className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              URL de YouTube
-            </label>
+          <AdminFormField label="URL de YouTube">
             <input
               type="url"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
               required
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              URL de miniatura
-            </label>
+          <AdminFormField label="URL de miniatura">
             <input
               type="url"
               value={thumbnailUrl}
               onChange={(e) => setThumbnailUrl(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Categoría
-            </label>
+          <AdminFormField label="Categoría">
             <select
               value={category}
               onChange={(e) =>
                 setCategory(e.target.value as LiveStreamCategory)
               }
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminSelectClass}
             >
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -297,39 +292,32 @@ export default function EditarTransmisionPage() {
                 </option>
               ))}
             </select>
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Fecha programada
-            </label>
+          <AdminFormField label="Fecha programada">
             <input
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Fecha/hora de finalización
-            </label>
+          <AdminFormField label="Fecha/hora de finalización">
             <input
               type="datetime-local"
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
-              className="w-full rounded-lg border px-4 py-2"
+              className={adminInputClass}
             />
-          </div>
+          </AdminFormField>
         </div>
+        </AdminPanelCard>
 
-        <div>
-          <label className="mb-3 block text-sm font-semibold text-gray-700">
-            Estado
-          </label>
+        <AdminPanelCard className="space-y-5">
+        <AdminFormField label="Estado">
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "draft"}>
               <input
                 type="radio"
                 name="status"
@@ -338,9 +326,9 @@ export default function EditarTransmisionPage() {
                 onChange={() => setStatus("draft")}
               />
               Borrador
-            </label>
+            </AdminRadioCard></label>
 
-            <label className="flex items-center gap-2 rounded-lg border px-4 py-3">
+            <label><AdminRadioCard checked={status === "published"}>
               <input
                 type="radio"
                 name="status"
@@ -349,39 +337,36 @@ export default function EditarTransmisionPage() {
                 onChange={() => setStatus("published")}
               />
               Publicado
-            </label>
+            </AdminRadioCard></label>
           </div>
-        </div>
+        </AdminFormField>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="flex items-center gap-3 rounded-lg border px-4 py-3">
+          <label><AdminToggleCard checked={isLive}>
             <input
               type="checkbox"
               checked={isLive}
               onChange={(e) => setIsLive(e.target.checked)}
             />
-            <span className="text-sm font-semibold text-gray-700">
-              Marcar como En vivo actual
-            </span>
-          </label>
+            Marcar como En vivo actual
+          </AdminToggleCard></label>
 
-          <label className="flex items-center gap-3 rounded-lg border px-4 py-3">
+          <label><AdminToggleCard checked={featured}>
             <input
               type="checkbox"
               checked={featured}
               onChange={(e) => setFeatured(e.target.checked)}
             />
-            <span className="text-sm font-semibold text-gray-700">
-              Marcar como Destacado
-            </span>
-          </label>
+            Marcar como Destacado
+          </AdminToggleCard></label>
         </div>
+        </AdminPanelCard>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.push("/admin/en-vivo")}
-            className="rounded-lg border px-5 py-2 font-semibold text-gray-700"
+            className={adminSecondaryButtonClass}
           >
             Cancelar
           </button>
@@ -389,12 +374,12 @@ export default function EditarTransmisionPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-[var(--ivbcc-gold)] px-5 py-2 font-semibold text-white disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {isSubmitting ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </form>
-    </main>
+    </AdminPageShell>
   );
 }

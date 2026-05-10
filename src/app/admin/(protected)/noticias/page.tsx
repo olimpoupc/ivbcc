@@ -2,23 +2,35 @@ import Link from "next/link";
 import Image from "next/image";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import { supabase } from "@/lib/supabase";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+  AdminStatusBadge,
+} from "@/components/admin/AdminPrimitives";
 import DeleteNewsButton from "./DeleteNewsButton";
 import PublishNewsButton from "./PublishNewsButton";
 
 const statusConfig = {
   published: {
     label: "Publicada",
-    className: "bg-green-50 text-green-700 border-green-200",
+    tone: "green",
   },
   scheduled: {
     label: "Programada",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
+    tone: "blue",
   },
   draft: {
     label: "Borrador",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    tone: "amber",
   },
-};
+} as const;
+
+const newsSelect =
+  "id,title,slug,summary,image_url,status,published_at,created_at";
 
 const statusFilters = [
   { label: "Todas", value: "all" },
@@ -51,7 +63,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
 
   const { data: noticias } = await supabase
     .from("news")
-    .select("*")
+    .select(newsSelect)
     .order("created_at", { ascending: false });
 
   const filteredNoticias = noticias?.filter((noticia) => {
@@ -67,33 +79,55 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
     return matchesStatus && matchesQuery;
   });
 
+  const publishedCount =
+    noticias?.filter((noticia) => (noticia.status || "published") === "published")
+      .length || 0;
+  const draftCount =
+    noticias?.filter((noticia) => (noticia.status || "published") === "draft")
+      .length || 0;
+
   return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Administración
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Administrar noticias
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-500">
-            Administra las noticias publicadas, programadas y borradores.
-          </p>
-        </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Administración"
+        title="Administrar noticias"
+        subtitle="Administra las noticias publicadas, programadas y borradores."
+        icon="news"
+        actions={
+          <AdminActionButton href="/admin/noticias/crear" icon="plus" tone="gold">
+            Crear nueva noticia
+          </AdminActionButton>
+        }
+      />
 
-        <Link
-          href="/admin/noticias/crear"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
-        >
-          + Crear nueva noticia
-        </Link>
-      </div>
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          label="Noticias totales"
+          value={noticias?.length || 0}
+          detail="Entradas registradas"
+          icon="news"
+          tone="slate"
+        />
+        <AdminMetricCard
+          label="Publicadas"
+          value={publishedCount}
+          detail="Visibles en el sitio"
+          icon="check"
+          tone="gold"
+        />
+        <AdminMetricCard
+          label="Borradores"
+          value={draftCount}
+          detail="Pendientes de publicar"
+          icon="file"
+          tone="navy"
+        />
+      </section>
 
-      <section className="rounded-xl border bg-white p-5 shadow-sm">
+      <AdminPanelCard>
         <form className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <div className="flex-1">
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Buscar por título o slug
             </label>
             <input
@@ -101,7 +135,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
               name="q"
               defaultValue={query}
               placeholder="Escribe para encontrar una noticia"
-              className="h-11 w-full rounded-lg border border-gray-200 px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[var(--ivbcc-gold)]/20"
+              className="h-12 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
             />
           </div>
 
@@ -109,7 +143,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
 
           <button
             type="submit"
-            className="h-11 rounded-lg bg-[var(--ivbcc-navy)] px-6 text-sm font-bold text-white transition hover:opacity-90"
+            className="h-12 rounded-full bg-[var(--ivbcc-navy)] px-6 text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
           >
             Buscar
           </button>
@@ -129,10 +163,10 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
               <Link
                 key={filter.value}
                 href={href}
-                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-full border px-4 py-2 text-sm font-extrabold transition ${
                   isActive
-                    ? "bg-[var(--ivbcc-gold)] text-white border-[var(--ivbcc-gold)]"
-                    : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-white"
+                    ? "border-[var(--ivbcc-gold)] bg-[var(--ivbcc-gold)] text-[var(--ivbcc-navy)]"
+                    : "border-[var(--ivbcc-line)] bg-white/70 text-[var(--ivbcc-muted)] hover:bg-white"
                 }`}
               >
                 {filter.label}
@@ -140,7 +174,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
             );
           })}
         </div>
-      </section>
+      </AdminPanelCard>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {filteredNoticias?.map((noticia, index) => {
@@ -152,9 +186,9 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
           return (
             <article
               key={noticia.id}
-              className="overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="premium-surface overflow-hidden rounded-[24px] transition hover:-translate-y-0.5 hover:shadow-xl"
             >
-              <div className="relative h-44 bg-gray-100">
+              <div className="relative h-44 bg-[var(--ivbcc-paper)]">
                 {noticia.image_url ? (
                   <Image
                     src={noticia.image_url}
@@ -172,31 +206,31 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
                   />
                 )}
 
-                <span
-                  className={`absolute left-4 top-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${currentStatus.className}`}
-                >
-                  {currentStatus.label}
+                <span className="absolute left-4 top-4">
+                  <AdminStatusBadge tone={currentStatus.tone}>
+                    {currentStatus.label}
+                  </AdminStatusBadge>
                 </span>
               </div>
 
               <div className="flex min-h-64 flex-col p-5">
                 <div className="flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="kicker">
                     {noticia.slug}
                   </p>
-                  <h2 className="mt-2 line-clamp-2 text-lg font-bold leading-tight text-gray-950">
+                  <h2 className="section-title mt-2 line-clamp-2 text-lg leading-tight text-[var(--ivbcc-ink)]">
                     {noticia.title}
                   </h2>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-500">
+                  <p className="muted-copy mt-3 line-clamp-3 text-sm leading-6">
                     {noticia.summary}
                   </p>
                 </div>
 
-                <div className="mt-5 border-t pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <div className="mt-5 border-t border-[var(--ivbcc-line)] pt-4">
+                  <p className="kicker">
                     Publicación
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-700">
+                  <p className="mt-1 text-sm font-semibold text-[var(--ivbcc-ink)]">
                     {formatDateTimeColombia(noticia.published_at)}
                   </p>
                 </div>
@@ -208,7 +242,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
 
                   <Link
                     href={`/admin/noticias/${noticia.id}/editar`}
-                    className="mt-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
+                    className="mt-2 rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
@@ -223,11 +257,20 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
         })}
 
         {filteredNoticias?.length === 0 && (
-          <div className="rounded-xl border bg-white px-5 py-12 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">
-            No se encontraron noticias con esos filtros.
+          <div className="md:col-span-2 xl:col-span-3">
+            <AdminEmptyState
+              title="No se encontraron noticias"
+              description="Ajusta los filtros o crea una nueva noticia para el sitio público."
+              icon="news"
+              action={
+                <AdminActionButton href="/admin/noticias/crear" icon="plus" tone="gold">
+                  Crear noticia
+                </AdminActionButton>
+              }
+            />
           </div>
         )}
       </section>
-    </main>
+    </AdminPageShell>
   );
 }
