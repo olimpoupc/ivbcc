@@ -25,11 +25,6 @@ type DataResult<T> = {
   error: unknown;
 };
 
-type ProfileRow = {
-  first_name: string | null;
-  last_name: string | null;
-};
-
 type ContactMessage = {
   id: string;
   full_name: string | null;
@@ -176,11 +171,6 @@ function statusLabel(value?: string | null) {
   return value ? statusLabels[value] || value : "Sin estado";
 }
 
-function fullName(profile?: ProfileRow | null) {
-  const name = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
-  return name || "Administrador";
-}
-
 function hasError(result: { error: unknown }) {
   return Boolean(result.error);
 }
@@ -191,12 +181,7 @@ export default async function AdminDashboardPage() {
   const today = new Date();
   const nowIso = today.toISOString();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const [
-    profileResult,
     newsPublished,
     upcomingEvents,
     activeCourses,
@@ -219,13 +204,6 @@ export default async function AdminDashboardPage() {
     latestContactMessage,
     chatbotItems,
   ] = await Promise.all([
-    user
-      ? supabase
-          .from("profiles")
-          .select("first_name,last_name")
-          .eq("id", user.id)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
     supabase
       .from("news")
       .select("id", { count: "exact", head: true })
@@ -329,7 +307,6 @@ export default async function AdminDashboardPage() {
   const count = (result: CountResult) => (result.error ? 0 : result.count || 0);
   const rows = <T,>(result: DataResult<T>) => (result.error ? [] : result.data || []);
 
-  const profile = profileResult.error ? null : profileResult.data;
   const eventRegistrationsCount = count(eventRegistrations);
   const courseEnrollmentsCount = count(courseEnrollments);
   const totalRegistrations = eventRegistrationsCount + courseEnrollmentsCount;
@@ -552,7 +529,7 @@ export default async function AdminDashboardPage() {
               {formatDate(today.toISOString())}
             </AdminStatusBadge>
             <AdminStatusBadge tone="navy">
-              Hola, {fullName(profile)}
+              Gestión del sistema
             </AdminStatusBadge>
             <AdminActionButton href="/" icon="external" tone="outline" external>
               Ver sitio público

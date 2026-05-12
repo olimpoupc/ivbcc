@@ -20,7 +20,6 @@ type AdminNavSection = {
 type AdminShellProps = {
   children: React.ReactNode;
   pathname: string;
-  adminName: string;
   adminRole?: string;
 };
 
@@ -81,7 +80,6 @@ function getCurrentNavItem(pathname: string) {
 export default function AdminShell({
   children,
   pathname,
-  adminName,
   adminRole = "Administrador",
 }: AdminShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -188,11 +186,11 @@ export default function AdminShell({
 
               <div className="premium-surface hidden items-center gap-3 rounded-full px-3 py-2 xl:flex">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--ivbcc-navy)] text-sm font-black text-[var(--ivbcc-gold-2)]">
-                  {adminName.slice(0, 1).toUpperCase()}
+                  IV
                 </div>
                 <div className="min-w-0">
                   <p className="max-w-36 truncate text-sm font-extrabold text-[var(--ivbcc-ink)]">
-                    {adminName}
+                    Administración IVBCC
                   </p>
                   <p className="text-xs font-semibold text-[var(--ivbcc-muted)]">
                     {adminRole}

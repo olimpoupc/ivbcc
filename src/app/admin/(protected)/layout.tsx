@@ -21,7 +21,7 @@ export default async function ProtectedAdminLayout({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("first_name,last_name,role")
+    .select("role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -33,15 +33,9 @@ export default async function ProtectedAdminLayout({
     redirect("/");
   }
 
-  const adminName =
-    `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-    user.email ||
-    "Administrador";
-
   return (
     <AdminShell
       pathname={pathname}
-      adminName={adminName}
       adminRole="Administrador"
     >
       {children}

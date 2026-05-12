@@ -53,7 +53,7 @@ export default async function EventoDetallePage({ params }: Props) {
   const { data: eventos, error } = await supabase
     .from("events")
     .select(
-      "id,title,slug,description,image_url,event_date,location,registration_enabled,registration_deadline,status,created_at"
+      "id,title,slug,description,image_url,event_date,location,registration_enabled,status,created_at"
     )
     .eq("status", "published")
     .order("event_date", { ascending: true })
