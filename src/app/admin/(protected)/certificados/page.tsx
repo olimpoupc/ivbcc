@@ -27,6 +27,16 @@ import RevokeCertificateButton from "./RevokeCertificateButton";
 
 const PAGE_SIZE = 10;
 
+// The "Cursos terminados" / "Sin certificado" cards below scan enrollments
+// to recompute course-completion state in app code (via buildCourseProgressState,
+// the same logic used across student-facing pages, so it isn't duplicated here
+// or in a SQL view). That scan has no natural page size, so it's capped to the
+// most recently created enrollments instead of loading the full history on
+// every request. Attempts/certificate lookups are scoped to exactly the users
+// pulled in by this cap, so results stay correct for everyone actually scanned —
+// only enrollments older than the cap can be missed once volume exceeds it.
+const COMPLETION_SCAN_LIMIT = 500;
+
 type Props = {
   searchParams: Promise<AdminListSearchParams>;
 };
@@ -72,7 +82,9 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
     .eq("status", "revoked");
   let courseBreakdownQuery = supabase
     .from("course_certificates")
-    .select("course_title");
+    .select("course_title")
+    .order("issued_at", { ascending: false })
+    .limit(COMPLETION_SCAN_LIMIT);
 
   if (selectedCourseId !== "all") {
     certificatesDataQuery = certificatesDataQuery.eq("course_id", selectedCourseId);
@@ -147,7 +159,9 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
         supabase
           .from("course_enrollments")
           .select("user_id,course_id")
-          .in("course_id", visibleCourseIds),
+          .in("course_id", visibleCourseIds)
+          .order("created_at", { ascending: false })
+          .limit(COMPLETION_SCAN_LIMIT),
         supabase
           .from("lessons")
           .select('id,course_id,"order"')
@@ -168,11 +182,12 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
     new Set((enrollments || []).map((enrollment) => enrollment.user_id))
   );
   const [{ data: attempts }, { data: profiles }] = await Promise.all([
-    quizIds.length
+    quizIds.length && userIds.length
       ? supabase
           .from("quiz_attempts")
           .select("user_id,quiz_id,score,total_questions,created_at")
           .in("quiz_id", quizIds)
+          .in("user_id", userIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
     userIds.length
@@ -187,13 +202,16 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
 
   let certificateKeysQuery = supabase
     .from("course_certificates")
-    .select("course_id,user_id");
+    .select("course_id,user_id")
+    .in("user_id", userIds);
 
   if (selectedCourseId !== "all") {
     certificateKeysQuery = certificateKeysQuery.eq("course_id", selectedCourseId);
   }
 
-  const { data: certificateKeys } = await certificateKeysQuery;
+  const { data: certificateKeys } = userIds.length
+    ? await certificateKeysQuery
+    : { data: [] };
   const certificatesByUserCourse = new Set(
     (certificateKeys || []).map((cert) => `${cert.course_id}:${cert.user_id}`)
   );
