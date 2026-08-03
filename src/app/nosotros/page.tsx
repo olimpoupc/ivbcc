@@ -1,17 +1,23 @@
 import Image from "next/image";
+import blasLigiaPhoto from "./blas-ligia.png";
+import joseRosaPhoto from "./jose-rosa.png";
+import julioIvonnePhoto from "./julio-ivonne.png";
 
 const founders = [
   {
     names: "Blas Antonio Pedrozo Florez y Ligia Molina de Pedrozo",
-    initials: "BP",
+    photo: blasLigiaPhoto,
+    bio: "Como visionarios y fundadores de la iglesia, los Pastores Blas y Ligia Pedrozo sembraron la semilla de lo que hoy es una vibrante comunidad de fe. Su pasión por el evangelio y su dedicación al servicio a Dios y a los demás guiaron cada paso, marcando el camino hacia el crecimiento espiritual y el bienestar de la comunidad. Son los pilares sobre los que se construyó esta iglesia, dejando un legado perdurable de fe, amor y compromiso con el Reino de Dios.",
   },
   {
     names: "Jose Herrera y Rosa Alicia Blanco",
-    initials: "JB",
+    photo: joseRosaPhoto,
+    bio: "Los Pastores José y Rosa Blanco asumieron la batuta del ministerio con una unción fresca y renovada, continuando el trabajo iniciado por los fundadores. Con visión para el futuro y un profundo amor por la congregación, han fortalecido las bases de la iglesia, guiando a los fieles hacia una vida de crecimiento espiritual y unidad, siempre enfocándose en el discipulado, el amor fraternal y el servicio en el nombre de Cristo.",
   },
   {
     names: "Julio César López Muñoz e Ivonne Dalila Díaz De Oro",
-    initials: "JD",
+    photo: julioIvonnePhoto,
+    bio: "Con una visión hacia el futuro, los Pastores Julio e Ivonne representan la próxima generación de liderazgo en la iglesia. Jóvenes y llenos de fervor por la obra de Dios, están llamados a continuar la misión de sus predecesores y llevar la iglesia a nuevas alturas, con un corazón lleno de pasión por los jóvenes y las nuevas generaciones, avanzando con la fe puesta en un futuro lleno de esperanza y transformación para la comunidad.",
   },
 ];
 
@@ -124,25 +130,30 @@ export default function NosotrosPage() {
           </h2>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-col gap-8">
           {founders.map((founder) => (
             <article
               key={founder.names}
-              className="editorial-card"
+              className="editorial-card flex flex-col overflow-hidden md:flex-row"
             >
-              <div className="flex h-64 items-center justify-center bg-[linear-gradient(135deg,#f3ecd6,#e7ddbb)]">
-                <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-[var(--ivbcc-navy)] text-3xl font-bold text-white">
-                  {founder.initials}
+              <div className="flex shrink-0 items-center justify-center bg-[linear-gradient(135deg,#f3ecd6,#e7ddbb)] p-6 md:w-64">
+                <div className="relative aspect-square w-full max-w-xs overflow-hidden rounded-2xl">
+                  <Image
+                    src={founder.photo}
+                    alt={founder.names}
+                    fill
+                    sizes="(min-width: 768px) 256px, 80vw"
+                    className="object-cover"
+                  />
                 </div>
               </div>
 
-              <div className="p-6">
+              <div className="flex flex-col justify-center p-6 md:p-8">
                 <h3 className="text-xl font-bold leading-snug text-gray-950">
                   {founder.names}
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-gray-600">
-                  Referentes del desarrollo histórico y espiritual de la obra de
-                  IVBCC.
+                <p className="mt-3 text-sm leading-7 text-gray-600">
+                  {founder.bio}
                 </p>
               </div>
             </article>
