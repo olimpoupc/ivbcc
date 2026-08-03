@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { submitQuizAttempt } from "./actions";
 
 type QuizOption = {
   id: string;
   option_text: string;
-  is_correct: boolean;
   order: number;
 };
 
@@ -73,56 +72,23 @@ export default function QuizResponseForm({ quizId, questions }: Props) {
       return;
     }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      alert("Debes iniciar sesión para responder este quiz.");
-      return;
-    }
-
-    let score = 0;
-
-    for (const question of questions) {
-      const selectedOptionId = answers[question.id];
-      const selectedOption = question.options.find(
-        (option) => option.id === selectedOptionId
-      );
-
-      if (selectedOption?.is_correct) {
-        score += 1;
-      }
-    }
-
     setStepError("");
     setIsSubmitting(true);
 
-    const { error } = await supabase.from("quiz_attempts").insert({
-      quiz_id: quizId,
-      user_id: user.id,
-      score,
-      total_questions: questions.length,
-    });
+    const result = await submitQuizAttempt(quizId, answers);
 
     setIsSubmitting(false);
 
-    if (error) {
-      alert("No pudimos guardar tu intento.");
-      console.error(error);
+    if (!result.success) {
+      setStepError(result.error);
       return;
     }
 
-    const percentage = questions.length
-      ? Math.round((score / questions.length) * 100)
-      : 0;
-
     setResult({
-      score,
-      total: questions.length,
-      percentage,
-      passed: percentage >= 60,
+      score: result.score,
+      total: result.total,
+      percentage: result.percentage,
+      passed: result.passed,
     });
     router.refresh();
   }

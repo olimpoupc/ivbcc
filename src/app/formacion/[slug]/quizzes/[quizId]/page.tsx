@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  createSupabaseServerClient,
+  createSupabaseServiceRoleClient,
+} from "@/lib/supabase-server";
 import {
   QUIZ_PASSING_PERCENTAGE,
   buildCourseProgressState,
@@ -52,10 +55,15 @@ export default async function QuizDetallePage({ params }: Props) {
   }
 
   const questionIds = (questions || []).map((question) => question.id);
+  // quiz_options is admin-only under RLS (see migration 20260803110000), so
+  // rendering the answer choices for a student needs the service-role
+  // client. Deliberately selects only what the UI needs — never is_correct —
+  // since this data reaches the browser. Grading happens server-side in
+  // ./actions.ts, the only place allowed to see correct answers.
   const { data: options, error: optionsError } = questionIds.length
-    ? await supabase
+    ? await createSupabaseServiceRoleClient()
         .from("quiz_options")
-        .select("*")
+        .select("id, question_id, option_text, order")
         .in("question_id", questionIds)
         .order("order", { ascending: true })
     : { data: [], error: null };
