@@ -202,7 +202,7 @@ export default async function AdminDashboardPage() {
     recentPublications,
     donationMethods,
     latestContactMessage,
-    chatbotItems,
+    helpCenterItems,
   ] = await Promise.all([
     supabase
       .from("news")
@@ -299,7 +299,7 @@ export default async function AdminDashboardPage() {
       .order("created_at", { ascending: false })
       .limit(1),
     supabase
-      .from("chatbot_items")
+      .from("help_center_items")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
   ]);
@@ -429,10 +429,10 @@ export default async function AdminDashboardPage() {
       icon: "message",
     },
     {
-      href: "/admin/chatbot",
-      label: "Gestionar chatbot",
-      description: "Edita respuestas rápidas.",
-      icon: "bot",
+      href: "/admin/centro-ayuda",
+      label: "Gestionar Centro de Ayuda",
+      description: "Edita contenido por categoría.",
+      icon: "spark",
     },
     {
       href: "/admin/certificados",
@@ -542,8 +542,8 @@ export default async function AdminDashboardPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <DashboardStat label="Entorno" value={getEnvLabel()} />
           <DashboardStat
-            label="Chatbot activo"
-            value={`${formatNumber(count(chatbotItems))} respuestas`}
+            label="Centro de Ayuda activo"
+            value={`${formatNumber(count(helpCenterItems))} contenidos`}
           />
           <DashboardStat
             label="Transmisión"
@@ -734,19 +734,19 @@ export default async function AdminDashboardPage() {
         </ModuleCard>
 
         <ModuleCard
-          title="Chatbot"
+          title="Centro de Ayuda"
           eyebrow="Orientación"
-          icon="bot"
-          actionHref="/admin/chatbot"
-          actionLabel="Gestionar chatbot"
+          icon="spark"
+          actionHref="/admin/centro-ayuda"
+          actionLabel="Gestionar Centro de Ayuda"
         >
           <p className="section-title text-4xl text-[var(--ivbcc-ink)]">
-            {formatNumber(count(chatbotItems))}
+            {formatNumber(count(helpCenterItems))}
           </p>
-          <p className="muted-copy mt-1 text-sm">Respuestas activas</p>
+          <p className="muted-copy mt-1 text-sm">Contenidos activos</p>
           <p className="muted-copy mt-4 text-sm">
-            Mantén actualizadas las respuestas rápidas sobre horarios, eventos,
-            formación y contacto.
+            Mantén actualizado el contenido por categoría sobre horarios,
+            eventos, formación y contacto.
           </p>
         </ModuleCard>
       </section>

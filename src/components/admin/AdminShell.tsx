@@ -53,7 +53,7 @@ const navSections: AdminNavSection[] = [
     label: "Herramientas",
     items: [
       { href: "/admin/donaciones", label: "Donaciones", icon: "donation" },
-      { href: "/admin/chatbot", label: "Chatbot", icon: "bot" },
+      { href: "/admin/centro-ayuda", label: "Centro de Ayuda", icon: "spark" },
     ],
   },
 ];

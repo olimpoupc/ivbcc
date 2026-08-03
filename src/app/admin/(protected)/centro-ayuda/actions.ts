@@ -3,21 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { getAdminUser } from "@/lib/admin-auth";
 
-export type ChatbotCategory =
+export type HelpCenterCategory =
   | "general"
   | "schedules"
+  | "location"
+  | "ministries"
+  | "donate"
   | "events"
   | "formation"
   | "live"
-  | "location"
-  | "contact"
   | "prayer"
+  | "contact"
   | "whatsapp";
 
-export type ChatbotItemInput = {
+export type HelpCenterItemInput = {
   title: string;
   message: string;
-  category: ChatbotCategory;
+  category: HelpCenterCategory;
   button_text: string;
   button_url: string;
   order_index: number;
@@ -26,15 +28,15 @@ export type ChatbotItemInput = {
 
 export type ActionResult = { success: true } | { success: false; error: string };
 
-function buildPayload(input: ChatbotItemInput) {
+function buildPayload(input: HelpCenterItemInput) {
   const title = input.title.trim();
   const message = input.message.trim();
 
   return { title, message, isValid: Boolean(title && message) };
 }
 
-export async function createChatbotItem(
-  input: ChatbotItemInput
+export async function createHelpCenterItem(
+  input: HelpCenterItemInput
 ): Promise<ActionResult> {
   const { supabase, isAdmin } = await getAdminUser();
   if (!isAdmin) return { success: false, error: "No autorizado." };
@@ -44,7 +46,7 @@ export async function createChatbotItem(
     return { success: false, error: "Título y mensaje son obligatorios." };
   }
 
-  const { error } = await supabase.from("chatbot_items").insert({
+  const { error } = await supabase.from("help_center_items").insert({
     title,
     message,
     category: input.category,
@@ -56,13 +58,13 @@ export async function createChatbotItem(
 
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/admin/chatbot");
+  revalidatePath("/admin/centro-ayuda");
   return { success: true };
 }
 
-export async function updateChatbotItem(
+export async function updateHelpCenterItem(
   id: string,
-  input: ChatbotItemInput
+  input: HelpCenterItemInput
 ): Promise<ActionResult> {
   const { supabase, isAdmin } = await getAdminUser();
   if (!isAdmin) return { success: false, error: "No autorizado." };
@@ -73,7 +75,7 @@ export async function updateChatbotItem(
   }
 
   const { error } = await supabase
-    .from("chatbot_items")
+    .from("help_center_items")
     .update({
       title,
       message,
@@ -87,11 +89,11 @@ export async function updateChatbotItem(
 
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/admin/chatbot");
+  revalidatePath("/admin/centro-ayuda");
   return { success: true };
 }
 
-export async function toggleChatbotItem(
+export async function toggleHelpCenterItem(
   id: string,
   isActive: boolean
 ): Promise<ActionResult> {
@@ -99,24 +101,24 @@ export async function toggleChatbotItem(
   if (!isAdmin) return { success: false, error: "No autorizado." };
 
   const { error } = await supabase
-    .from("chatbot_items")
+    .from("help_center_items")
     .update({ is_active: isActive })
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/admin/chatbot");
+  revalidatePath("/admin/centro-ayuda");
   return { success: true };
 }
 
-export async function deleteChatbotItem(id: string): Promise<ActionResult> {
+export async function deleteHelpCenterItem(id: string): Promise<ActionResult> {
   const { supabase, isAdmin } = await getAdminUser();
   if (!isAdmin) return { success: false, error: "No autorizado." };
 
-  const { error } = await supabase.from("chatbot_items").delete().eq("id", id);
+  const { error } = await supabase.from("help_center_items").delete().eq("id", id);
 
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/admin/chatbot");
+  revalidatePath("/admin/centro-ayuda");
   return { success: true };
 }

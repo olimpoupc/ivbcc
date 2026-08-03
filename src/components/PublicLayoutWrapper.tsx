@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import GoogleAnalytics from "./analytics/GoogleAnalytics";
-import ChatbotWidget from "./chatbot/ChatbotWidget";
+import HelpCenterWidget from "./help-center/HelpCenterWidget";
 import type { PublicSiteSettings } from "@/lib/site-settings";
 
 export default function PublicLayoutWrapper({
@@ -31,7 +31,7 @@ export default function PublicLayoutWrapper({
       <Navbar siteSettings={resolvedSiteSettings} />
       {children}
       <Footer siteSettings={resolvedSiteSettings} />
-      <ChatbotWidget siteSettings={resolvedSiteSettings} />
+      <HelpCenterWidget siteSettings={resolvedSiteSettings} />
     </>
   );
 }

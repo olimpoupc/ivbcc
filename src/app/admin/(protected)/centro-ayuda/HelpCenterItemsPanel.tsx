@@ -10,18 +10,18 @@ import {
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
 import {
-  createChatbotItem,
-  deleteChatbotItem,
-  toggleChatbotItem,
-  updateChatbotItem,
-  type ChatbotCategory,
+  createHelpCenterItem,
+  deleteHelpCenterItem,
+  toggleHelpCenterItem,
+  updateHelpCenterItem,
+  type HelpCenterCategory,
 } from "./actions";
 
-export type ChatbotItemRow = {
+export type HelpCenterItemRow = {
   id: string;
   title: string;
   message: string;
-  category: ChatbotCategory;
+  category: HelpCenterCategory;
   button_text: string;
   button_url: string;
   order_index: number;
@@ -33,7 +33,7 @@ export type ChatbotItemRow = {
 type FormState = {
   title: string;
   message: string;
-  category: ChatbotCategory;
+  category: HelpCenterCategory;
   button_text: string;
   button_url: string;
   order_index: string;
@@ -46,19 +46,21 @@ type Feedback = {
 };
 
 type Props = {
-  initialItems: ChatbotItemRow[];
+  initialItems: HelpCenterItemRow[];
 };
 
-const categoryOptions: Array<{ value: ChatbotCategory; label: string }> = [
-  { value: "general", label: "General" },
+const categoryOptions: Array<{ value: HelpCenterCategory; label: string }> = [
   { value: "schedules", label: "Horarios" },
+  { value: "location", label: "Ubicación" },
+  { value: "ministries", label: "Ministerios" },
+  { value: "donate", label: "Cómo donar" },
   { value: "events", label: "Eventos" },
   { value: "formation", label: "Formación" },
   { value: "live", label: "En Vivo" },
-  { value: "location", label: "Ubicación" },
-  { value: "contact", label: "Contacto" },
   { value: "prayer", label: "Oración" },
+  { value: "contact", label: "Contacto" },
   { value: "whatsapp", label: "WhatsApp" },
+  { value: "general", label: "General" },
 ];
 
 const emptyForm: FormState = {
@@ -73,9 +75,9 @@ const emptyForm: FormState = {
 
 const categoryLabels = Object.fromEntries(
   categoryOptions.map((category) => [category.value, category.label])
-) as Record<ChatbotCategory, string>;
+) as Record<HelpCenterCategory, string>;
 
-function toFormState(item: ChatbotItemRow): FormState {
+function toFormState(item: HelpCenterItemRow): FormState {
   return {
     title: item.title,
     message: item.message,
@@ -87,7 +89,7 @@ function toFormState(item: ChatbotItemRow): FormState {
   };
 }
 
-function sortItems(items: ChatbotItemRow[]) {
+function sortItems(items: HelpCenterItemRow[]) {
   return [...items].sort((first, second) => {
     if (first.order_index !== second.order_index) {
       return first.order_index - second.order_index;
@@ -97,7 +99,7 @@ function sortItems(items: ChatbotItemRow[]) {
   });
 }
 
-export default function ChatbotItemsPanel({ initialItems }: Props) {
+export default function HelpCenterItemsPanel({ initialItems }: Props) {
   const router = useRouter();
   const sortedItems = useMemo(() => sortItems(initialItems), [initialItems]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setForm(emptyForm);
   }
 
-  function handleEdit(item: ChatbotItemRow) {
+  function handleEdit(item: HelpCenterItemRow) {
     setEditingId(item.id);
     setForm(toFormState(item));
     setFeedback({ type: "info", message: "" });
@@ -139,11 +141,11 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     };
 
     setIsSaving(true);
-    setFeedback({ type: "info", message: "Guardando respuesta..." });
+    setFeedback({ type: "info", message: "Guardando contenido..." });
 
     const result = editingId
-      ? await updateChatbotItem(editingId, input)
-      : await createChatbotItem(input);
+      ? await updateHelpCenterItem(editingId, input)
+      : await createHelpCenterItem(input);
 
     setIsSaving(false);
 
@@ -158,16 +160,16 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setFeedback({
       type: "success",
       message: wasEditing
-        ? "Respuesta actualizada correctamente."
-        : "Respuesta creada correctamente.",
+        ? "Contenido actualizado correctamente."
+        : "Contenido creado correctamente.",
     });
   }
 
-  async function handleToggle(item: ChatbotItemRow) {
+  async function handleToggle(item: HelpCenterItemRow) {
     setIsSaving(true);
     setFeedback({ type: "info", message: "Actualizando estado..." });
 
-    const result = await toggleChatbotItem(item.id, !item.is_active);
+    const result = await toggleHelpCenterItem(item.id, !item.is_active);
 
     setIsSaving(false);
 
@@ -180,19 +182,19 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setFeedback({
       type: "success",
       message: item.is_active
-        ? "Respuesta desactivada correctamente."
-        : "Respuesta activada correctamente.",
+        ? "Contenido desactivado correctamente."
+        : "Contenido activado correctamente.",
     });
   }
 
-  async function handleDelete(item: ChatbotItemRow) {
-    const confirmed = confirm(`¿Eliminar la respuesta "${item.title}"?`);
+  async function handleDelete(item: HelpCenterItemRow) {
+    const confirmed = confirm(`¿Eliminar "${item.title}"?`);
     if (!confirmed) return;
 
     setIsSaving(true);
-    setFeedback({ type: "info", message: "Eliminando respuesta..." });
+    setFeedback({ type: "info", message: "Eliminando contenido..." });
 
-    const result = await deleteChatbotItem(item.id);
+    const result = await deleteHelpCenterItem(item.id);
 
     setIsSaving(false);
 
@@ -208,7 +210,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     router.refresh();
     setFeedback({
       type: "success",
-      message: "Respuesta eliminada correctamente.",
+      message: "Contenido eliminado correctamente.",
     });
   }
 
@@ -216,13 +218,14 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     <section className="grid gap-8 xl:grid-cols-[0.8fr_1.2fr]">
       <AdminPanelCard>
         <div className="mb-6">
-          <p className="kicker">{isEditing ? "Edición" : "Nueva respuesta"}</p>
+          <p className="kicker">{isEditing ? "Edición" : "Nuevo contenido"}</p>
           <h2 className="section-title mt-1 text-xl text-[var(--ivbcc-ink)]">
-            {isEditing ? "Editar respuesta" : "Crear respuesta"}
+            {isEditing ? "Editar contenido" : "Crear contenido"}
           </h2>
           <p className="muted-copy mt-1 text-sm">
-            Define el texto que verá el visitante y el enlace opcional del
-            botón.
+            Cada categoría agrupa el contenido en el widget público. El botón
+            opcional puede enlazar a otra página del sitio (ej. /contacto) o a
+            una URL externa.
           </p>
         </div>
 
@@ -236,7 +239,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
               value={form.title}
               onChange={(event) => updateForm("title", event.target.value)}
               className={inputClassName}
-              placeholder="Ej: Horarios"
+              placeholder="Ej: Horarios de servicios"
             />
           </div>
 
@@ -249,7 +252,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
               onChange={(event) => updateForm("message", event.target.value)}
               rows={5}
               className={textareaClassName}
-              placeholder="Escribe la respuesta rápida del chatbot..."
+              placeholder="Escribe la respuesta corta que verá el visitante..."
             />
           </div>
 
@@ -261,7 +264,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
               <select
                 value={form.category}
                 onChange={(event) =>
-                  updateForm("category", event.target.value as ChatbotCategory)
+                  updateForm("category", event.target.value as HelpCenterCategory)
                 }
                 className={inputClassName}
               >
@@ -300,7 +303,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                   updateForm("button_text", event.target.value)
                 }
                 className={inputClassName}
-                placeholder="Ej: Ver eventos"
+                placeholder="Ej: Ver todos los horarios"
               />
             </div>
 
@@ -315,7 +318,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                   updateForm("button_url", event.target.value)
                 }
                 className={inputClassName}
-                placeholder="/eventos o https://..."
+                placeholder="/contacto o https://..."
               />
             </div>
           </div>
@@ -327,7 +330,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
               onChange={(event) => updateForm("is_active", event.target.checked)}
               className="h-4 w-4 accent-[var(--ivbcc-gold)]"
             />
-            Activa
+            Activo
           </label>
 
           <AuthFeedback type={feedback.type} message={feedback.message} />
@@ -338,7 +341,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
               disabled={isSaving}
               className="rounded-full bg-[var(--ivbcc-gold)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-navy)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
             >
-              {isEditing ? "Guardar cambios" : "Crear respuesta"}
+              {isEditing ? "Guardar cambios" : "Crear contenido"}
             </button>
 
             {isEditing && (
@@ -356,9 +359,9 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
       </AdminPanelCard>
 
       <AdminSection
-        title="Respuestas rápidas"
-        subtitle="Se muestran ordenadas por el campo de orden."
-        icon="bot"
+        title="Contenido del Centro de Ayuda"
+        subtitle="Se muestran agrupadas por categoría en el widget público, ordenadas por el campo de orden."
+        icon="spark"
       >
         <AdminPanelCard>
 
@@ -367,7 +370,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
             <thead className="bg-[var(--ivbcc-paper)]">
               <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-[var(--ivbcc-muted)]">
                 <th className="pb-3 pr-4">Orden</th>
-                <th className="pb-3 pr-4">Respuesta</th>
+                <th className="pb-3 pr-4">Contenido</th>
                 <th className="pb-3 pr-4">Categoría</th>
                 <th className="pb-3 pr-4">Estado</th>
                 <th className="pb-3 text-right">Acciones</th>
@@ -398,7 +401,7 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
                   </td>
                   <td className="py-4 pr-4">
                     <AdminStatusBadge tone={item.is_active ? "green" : "slate"}>
-                      {item.is_active ? "Activa" : "Inactiva"}
+                      {item.is_active ? "Activo" : "Inactivo"}
                     </AdminStatusBadge>
                   </td>
                   <td className="py-4">
@@ -437,9 +440,9 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
 
         {sortedItems.length === 0 && (
           <AdminEmptyState
-            title="Aún no hay respuestas rápidas"
-            description="Crea la primera respuesta para alimentar el chatbot público."
-            icon="bot"
+            title="Aún no hay contenido"
+            description="Crea el primer elemento para alimentar el Centro de Ayuda."
+            icon="spark"
           />
         )}
         </AdminPanelCard>

@@ -4,17 +4,17 @@ import {
   AdminPageHeader,
   AdminPageShell,
 } from "@/components/admin/AdminPrimitives";
-import ChatbotItemsPanel, { type ChatbotItemRow } from "./ChatbotItemsPanel";
+import HelpCenterItemsPanel, { type HelpCenterItemRow } from "./HelpCenterItemsPanel";
 
-const chatbotItemSelect =
+const helpCenterItemSelect =
   "id,title,message,category,button_text,button_url,order_index,is_active,created_at,updated_at";
 
-export default async function AdminChatbotPage() {
+export default async function AdminHelpCenterPage() {
   const supabase = await createSupabaseServerClient();
 
   const { data: items, error } = await supabase
-    .from("chatbot_items")
-    .select(chatbotItemSelect)
+    .from("help_center_items")
+    .select(helpCenterItemSelect)
     .order("order_index", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -22,16 +22,16 @@ export default async function AdminChatbotPage() {
     return (
       <AdminPageShell>
         <AdminPageHeader
-          eyebrow="Asistente digital"
-          title="Chatbot IVBCC"
-          subtitle="No fue posible cargar las respuestas del chatbot."
-          icon="bot"
+          eyebrow="Autoservicio para visitantes"
+          title="Centro de Ayuda"
+          subtitle="No fue posible cargar el contenido del centro de ayuda."
+          icon="spark"
         />
       </AdminPageShell>
     );
   }
 
-  const rows: ChatbotItemRow[] = (items || []).map((item) => ({
+  const rows: HelpCenterItemRow[] = (items || []).map((item) => ({
     id: item.id,
     title: item.title,
     message: item.message,
@@ -49,37 +49,37 @@ export default async function AdminChatbotPage() {
   return (
     <AdminPageShell>
       <AdminPageHeader
-        eyebrow="Asistente digital"
-        title="Chatbot IVBCC"
-        subtitle="Gestiona respuestas rápidas para orientar a visitantes sobre horarios, eventos, formación, contacto y otros temas frecuentes."
-        icon="bot"
+        eyebrow="Autoservicio para visitantes"
+        title="Centro de Ayuda"
+        subtitle="Gestiona el contenido que guía a los visitantes por categorías (horarios, ubicación, ministerios, donaciones, eventos, formación y más) antes de derivarlos a WhatsApp."
+        icon="spark"
       />
 
       <section className="grid gap-6 md:grid-cols-3">
         <AdminMetricCard
-          label="Respuestas registradas"
+          label="Contenido registrado"
           value={rows.length}
           detail="Base de conocimiento"
-          icon="bot"
+          icon="spark"
           tone="slate"
         />
         <AdminMetricCard
-          label="Activas"
+          label="Activo"
           value={activeCount}
-          detail="Disponibles al visitante"
+          detail="Visible para el visitante"
           icon="check"
           tone="gold"
         />
         <AdminMetricCard
-          label="Inactivas"
+          label="Inactivo"
           value={rows.length - activeCount}
-          detail="Ocultas temporalmente"
+          detail="Oculto temporalmente"
           icon="activity"
           tone="navy"
         />
       </section>
 
-      <ChatbotItemsPanel initialItems={rows} />
+      <HelpCenterItemsPanel initialItems={rows} />
     </AdminPageShell>
   );
 }
