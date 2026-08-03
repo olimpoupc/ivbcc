@@ -24,7 +24,7 @@ export default async function CursoLeccionesPage({ params }: Props) {
       supabase.from("courses").select("id,title").eq("id", id).maybeSingle(),
       supabase
         .from("lessons")
-        .select("id,title,order")
+        .select("id,title,order,material_url")
         .eq("course_id", id)
         .order("order", { ascending: true }),
     ]);
@@ -99,7 +99,11 @@ export default async function CursoLeccionesPage({ params }: Props) {
                 >
                   Editar
                 </Link>
-                <DeleteLessonButton id={lesson.id} />
+                <DeleteLessonButton
+                  id={lesson.id}
+                  courseId={id}
+                  materialUrl={lesson.material_url}
+                />
               </div>
             </article>
           ))

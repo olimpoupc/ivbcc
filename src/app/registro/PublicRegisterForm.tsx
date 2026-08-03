@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { trackEvent } from "@/lib/analytics";
 import { isClientRateLimited, sanitizeText } from "@/lib/security";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import AuthFeedback from "@/components/AuthFeedback";
 import FormField from "@/components/ui/FormField";
 
@@ -90,24 +91,9 @@ export default function PublicRegisterForm() {
 
     if (error) {
       console.error(error);
-
-      const normalizedMessage = error.message?.toLowerCase() || "";
-
-      if (
-        normalizedMessage.includes("already registered") ||
-        normalizedMessage.includes("user already registered") ||
-        normalizedMessage.includes("already exists")
-      ) {
-        setFeedback({
-          type: "error",
-          message: "Este correo ya está registrado. Intenta iniciar sesión.",
-        });
-        return;
-      }
-
       setFeedback({
         type: "error",
-        message: error.message || "No pudimos completar el registro.",
+        message: getUserFacingErrorMessage(error, "No pudimos completar el registro."),
       });
       return;
     }
@@ -125,7 +111,10 @@ export default function PublicRegisterForm() {
         console.error(profileError);
         setFeedback({
           type: "error",
-          message: profileError.message || "No pudimos completar el registro.",
+          message: getUserFacingErrorMessage(
+            profileError,
+            "No pudimos completar el registro."
+          ),
         });
         return;
       }
@@ -155,7 +144,7 @@ export default function PublicRegisterForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: error.message || "Google aún no está configurado.",
+        message: getUserFacingErrorMessage(error, "Google aún no está configurado."),
       });
     }
   }

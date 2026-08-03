@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { trackEvent } from "@/lib/analytics";
 import { isClientRateLimited } from "@/lib/security";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import AuthFeedback from "@/components/AuthFeedback";
 import FormField from "@/components/ui/FormField";
 
@@ -23,16 +24,6 @@ export default function PublicLoginForm() {
     message: string;
   } | null>(null);
 
-  function getReadableErrorMessage(message?: string) {
-    const normalizedMessage = message?.toLowerCase() || "";
-
-    if (normalizedMessage.includes("email not confirmed")) {
-      return "Tu correo aún no ha sido confirmado. Revisa tu bandeja de entrada y confirma tu cuenta antes de iniciar sesión.";
-    }
-
-    return message || "No pudimos iniciar sesión.";
-  }
-
   const redirectByRole = useCallback(async (user: {
     id: string;
     user_metadata?: Record<string, unknown>;
@@ -47,7 +38,7 @@ export default function PublicLoginForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: getReadableErrorMessage(error.message),
+        message: getUserFacingErrorMessage(error, "No pudimos verificar tu perfil."),
       });
       router.push("/formacion");
       router.refresh();
@@ -79,7 +70,10 @@ export default function PublicLoginForm() {
         console.error(insertError);
         setFeedback({
           type: "error",
-          message: getReadableErrorMessage(insertError.message),
+          message: getUserFacingErrorMessage(
+            insertError,
+            "No pudimos completar tu perfil."
+          ),
         });
         router.push("/formacion");
         router.refresh();
@@ -152,7 +146,7 @@ export default function PublicLoginForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: getReadableErrorMessage(error.message),
+        message: getUserFacingErrorMessage(error, "No pudimos iniciar sesión."),
       });
       return;
     }
@@ -191,7 +185,7 @@ export default function PublicLoginForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: getReadableErrorMessage(error.message),
+        message: getUserFacingErrorMessage(error, "No pudimos iniciar sesión con Google."),
       });
     }
   }

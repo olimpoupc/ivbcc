@@ -1,43 +1,41 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { useState, useTransition } from "react";
+import { publishPublication } from "./actions";
 
 type Props = {
   id: string;
 };
 
 export default function PublishPublicationButton({ id }: Props) {
-  async function handlePublish() {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  function handlePublish() {
     const confirmPublish = confirm(
       "¿Deseas publicar esta publicación ahora?"
     );
 
     if (!confirmPublish) return;
 
-    const { error } = await supabase
-      .from("publications")
-      .update({
-        status: "published",
-        published_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      alert(error.message || "Error al publicar la publicación");
-      console.error(error);
-      return;
-    }
-
-    alert("Publicación publicada correctamente");
-    window.location.reload();
+    setError("");
+    startTransition(async () => {
+      const result = await publishPublication(id);
+      if (!result.success) setError(result.error);
+    });
   }
 
   return (
-    <button
-      onClick={handlePublish}
-      className="rounded-full bg-green-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-green-700"
-    >
-      Publicar
-    </button>
+    <div className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={handlePublish}
+        disabled={isPending}
+        className="rounded-full bg-green-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-green-700 disabled:opacity-60"
+      >
+        {isPending ? "Publicando..." : "Publicar"}
+      </button>
+      {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
+    </div>
   );
 }

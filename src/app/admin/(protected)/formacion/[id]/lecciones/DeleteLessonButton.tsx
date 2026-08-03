@@ -1,35 +1,41 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { useState, useTransition } from "react";
+import { deleteLesson } from "./actions";
 
 type Props = {
   id: string;
+  courseId: string;
+  materialUrl?: string | null;
 };
 
-export default function DeleteLessonButton({ id }: Props) {
-  async function handleDelete() {
+export default function DeleteLessonButton({ id, courseId, materialUrl }: Props) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+
+  function handleDelete() {
     const confirmDelete = confirm("¿Seguro que deseas eliminar esta lección?");
 
     if (!confirmDelete) return;
 
-    const { error } = await supabase.from("lessons").delete().eq("id", id);
-
-    if (error) {
-      alert("Error al eliminar la lección");
-      console.error(error);
-      return;
-    }
-
-    alert("Lección eliminada correctamente");
-    window.location.reload();
+    setError("");
+    startTransition(async () => {
+      const result = await deleteLesson(id, courseId, materialUrl ?? null);
+      if (!result.success) setError(result.error);
+    });
   }
 
   return (
-    <button
-      onClick={handleDelete}
-      className="rounded-full bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700"
-    >
-      Eliminar
-    </button>
+    <div className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={isPending}
+        className="rounded-full bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700 disabled:opacity-60"
+      >
+        {isPending ? "Eliminando..." : "Eliminar"}
+      </button>
+      {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
+    </div>
   );
 }

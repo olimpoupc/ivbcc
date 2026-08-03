@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { trackEvent } from "@/lib/analytics";
+import { isClientRateLimited, sanitizeText } from "@/lib/security";
 import FormField from "@/components/ui/FormField";
 
 type Props = {
@@ -52,6 +53,12 @@ export default function EventRegistrationForm({ eventId }: Props) {
       return;
     }
 
+    if (isClientRateLimited(`event-registration:${eventId}`, 5, 60 * 60 * 1000)) {
+      setMessageType("error");
+      setMessage("Demasiados intentos. Espera unos minutos e inténtalo de nuevo.");
+      return;
+    }
+
     setIsSubmitting(true);
     const registrationKey = `event-registration:${eventId}:${normalizedEmail}`;
 
@@ -62,9 +69,18 @@ export default function EventRegistrationForm({ eventId }: Props) {
       return;
     }
 
+    const cleanFullName = sanitizeText(fullName, 120);
+
+    if (!cleanFullName) {
+      setMessageType("error");
+      setMessage("Ingresa tu nombre completo.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const { error } = await supabase.from("event_registrations").insert({
       event_id: eventId,
-      full_name: fullName.trim(),
+      full_name: cleanFullName,
       email: normalizedEmail,
       phone: normalizedPhone || null,
     });
@@ -76,6 +92,12 @@ export default function EventRegistrationForm({ eventId }: Props) {
 
       if (error.code === "23505") {
         setMessage("Ya estás inscrito en este evento.");
+        return;
+      }
+
+      if (error.code === "P0001") {
+        setMessage(error.message);
+        console.error(error);
         return;
       }
 

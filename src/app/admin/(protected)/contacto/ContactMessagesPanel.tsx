@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
   AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
-
-const contactMessageSelect =
-  "id,full_name,email,phone,church_name,subject,category,message,status,admin_response,responded_at,updated_at,created_at";
+import { deleteContactMessage, updateContactMessage } from "./actions";
 
 type MessageStatus = "pending" | "read" | "responded" | "archived";
 type MessageCategory =
@@ -89,20 +87,6 @@ function getStatusTone(status: MessageStatus) {
   return "slate";
 }
 
-function escapeCsvValue(value: string) {
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
-function formatDateColombia(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Bogota",
-  }).format(new Date(value));
-}
-
 function buildMailtoHref(message: ContactMessageRow) {
   const subject = `Respuesta IVBCC - ${message.subject}`;
   const body = `Hola ${message.full_name},
@@ -136,7 +120,7 @@ function buildWhatsAppHref(message: ContactMessageRow) {
 }
 
 export default function ContactMessagesPanel({ initialMessages }: Props) {
-  const [messages, setMessages] = useState(initialMessages);
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | MessageStatus>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | MessageCategory>("all");
@@ -160,7 +144,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredMessages = useMemo(() => {
-    return messages.filter((message) => {
+    return initialMessages.filter((message) => {
       const matchesQuery = normalizedQuery
         ? [
             message.full_name,
@@ -180,7 +164,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
       return matchesQuery && matchesStatus && matchesCategory;
     });
-  }, [messages, normalizedQuery, statusFilter, categoryFilter]);
+  }, [initialMessages, normalizedQuery, statusFilter, categoryFilter]);
 
   const activeSelectedMessageId =
     filteredMessages.find((message) => message.id === selectedMessageId)?.id ||
@@ -202,92 +186,65 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   const whatsappHref = selectedMessage ? buildWhatsAppHref(selectedMessage) : null;
   const mailtoHref = selectedMessage ? buildMailtoHref(selectedMessage) : "#";
 
-  async function updateMessage(
-    id: string,
-    values: Partial<{
-      status: MessageStatus;
-      admin_response: string;
-      responded_at: string | null;
-    }>
-  ) {
-    setIsSaving(true);
-    setFeedback({ type: "info", message: "Guardando cambios..." });
-
-    const { data, error } = await supabase
-      .from("contact_messages")
-      .update(values)
-      .eq("id", id)
-      .select(contactMessageSelect)
-      .maybeSingle();
-
-    setIsSaving(false);
-
-    if (error || !data) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message: error?.message || "No pudimos actualizar el mensaje.",
-      });
-      return null;
-    }
-
-    const nextMessage: ContactMessageRow = {
-      id: data.id,
-      full_name: data.full_name,
-      email: data.email,
-      phone: data.phone || "",
-      church_name: data.church_name || "",
-      subject: data.subject,
-      category: data.category,
-      message: data.message,
-      status: data.status,
-      admin_response: data.admin_response || "",
-      responded_at: data.responded_at,
-      updated_at: data.updated_at,
-      created_at: data.created_at,
-      created_at_label: formatDateColombia(data.created_at),
-      responded_at_label: formatDateColombia(data.responded_at),
-      updated_at_label: formatDateColombia(data.updated_at),
-    };
-
-    setMessages((current) =>
-      current.map((message) => (message.id === id ? nextMessage : message))
-    );
-    setFeedback({ type: "success", message: "Cambios guardados correctamente." });
-
-    return nextMessage;
-  }
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    const qs = params.toString();
+    return `/api/export/contacto${qs ? `?${qs}` : ""}`;
+  }, [query, statusFilter, categoryFilter]);
 
   async function handleStatusChange(status: MessageStatus) {
     if (!selectedMessage) return;
 
-    await updateMessage(selectedMessage.id, {
+    setIsSaving(true);
+    setFeedback({ type: "info", message: "Guardando cambios..." });
+
+    const result = await updateContactMessage(selectedMessage.id, {
       status,
       responded_at:
         status === "responded"
           ? new Date().toISOString()
           : selectedMessage.responded_at || null,
     });
+
+    setIsSaving(false);
+
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    router.refresh();
+    setFeedback({ type: "success", message: "Cambios guardados correctamente." });
   }
 
   async function handleSaveNote() {
     if (!selectedMessage) return;
 
     const nextNote = activeNoteDraft.trim();
-    const updatedMessage = await updateMessage(selectedMessage.id, {
+
+    setIsSaving(true);
+    setFeedback({ type: "info", message: "Guardando cambios..." });
+
+    const result = await updateContactMessage(selectedMessage.id, {
       admin_response: nextNote,
     });
 
-    if (updatedMessage) {
-      setNoteDraft({
-        messageId: updatedMessage.id,
-        value: updatedMessage.admin_response,
-      });
-      setFeedback({
-        type: "success",
-        message: "Nota interna guardada. No se envió ningún correo.",
-      });
+    setIsSaving(false);
+
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
+      return;
     }
+
+    setNoteDraft({ messageId: selectedMessage.id, value: nextNote });
+    router.refresh();
+    setFeedback({
+      type: "success",
+      message: "Nota interna guardada. No se envió ningún correo.",
+    });
   }
 
   async function handleDelete() {
@@ -299,26 +256,17 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     setIsSaving(true);
     setFeedback({ type: "info", message: "Eliminando mensaje..." });
 
-    const { error } = await supabase
-      .from("contact_messages")
-      .delete()
-      .eq("id", selectedMessage.id);
+    const result = await deleteContactMessage(selectedMessage.id);
 
     setIsSaving(false);
 
-    if (error) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message: error.message || "No pudimos eliminar el mensaje.",
-      });
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
 
-    setMessages((current) =>
-      current.filter((message) => message.id !== selectedMessage.id)
-    );
     setSelectedMessageId(null);
+    router.refresh();
     setFeedback({ type: "success", message: "Mensaje eliminado correctamente." });
   }
 
@@ -336,36 +284,6 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
         message: `No pudimos copiar ${label.toLowerCase()}.`,
       });
     }
-  }
-
-  function handleExportCsv() {
-    const header = "Nombre;Correo;Teléfono;Categoría;Asunto;Estado;Fecha";
-    const rows = filteredMessages.map((message) =>
-      [
-        message.full_name,
-        message.email,
-        message.phone || "",
-        categoryConfig[message.category] || "Otro",
-        message.subject,
-        getStatusConfig(message.status).label,
-        message.created_at_label,
-      ]
-        .map((value) => escapeCsvValue(value))
-        .join(";")
-    );
-
-    const csvContent = ["sep=;", header, ...rows].join("\n");
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "mensajes-contacto-ivbcc.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   }
 
   return (
@@ -425,13 +343,12 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
           </label>
 
           <div className="flex items-end">
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="w-full rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--ivbcc-navy-2)]"
+            <a
+              href={exportHref}
+              className="flex w-full items-center justify-center rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--ivbcc-navy-2)]"
             >
               Exportar CSV
-            </button>
+            </a>
           </div>
         </div>
       </AdminPanelCard>

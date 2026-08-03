@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildCourseProgressState } from "@/lib/course-progress";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   buildCertificateCode,
   toCertificateViewModel,
@@ -135,9 +136,10 @@ export async function getOrCreateCourseCertificate(
         .maybeSingle();
 
     if (existingCertificateError) {
+      console.error(existingCertificateError);
       return {
         ok: false,
-        message: `No pudimos consultar tu certificado: ${existingCertificateError.message}`,
+        message: "No pudimos consultar tu certificado. Inténtalo de nuevo.",
       };
     }
 
@@ -157,7 +159,8 @@ export async function getOrCreateCourseCertificate(
       .maybeSingle();
 
     if (profileError) {
-      return { ok: false, message: `No pudimos consultar tu perfil: ${profileError.message}` };
+      console.error(profileError);
+      return { ok: false, message: "No pudimos consultar tu perfil. Inténtalo de nuevo." };
     }
 
     const inputFirstName = profileInput?.firstName?.trim() || "";
@@ -189,9 +192,10 @@ export async function getOrCreateCourseCertificate(
       });
 
       if (updateProfileError) {
+        console.error(updateProfileError);
         return {
           ok: false,
-          message: `No pudimos guardar tus datos de perfil: ${updateProfileError.message}`,
+          message: "No pudimos guardar tus datos de perfil. Inténtalo de nuevo.",
         };
       }
     }
@@ -246,9 +250,10 @@ export async function getOrCreateCourseCertificate(
         continue;
       }
 
+      console.error(insertError);
       return {
         ok: false,
-        message: `No pudimos crear el certificado: ${insertError?.message || "Error desconocido."}`,
+        message: "No pudimos crear el certificado. Inténtalo de nuevo.",
       };
     }
 
@@ -257,12 +262,10 @@ export async function getOrCreateCourseCertificate(
       message: "No pudimos generar un código único para el certificado.",
     };
   } catch (error) {
+    console.error(error);
     return {
       ok: false,
-      message:
-        error instanceof Error
-          ? `Error generando certificado: ${error.message}`
-          : "Error generando certificado.",
+      message: getUserFacingErrorMessage(error, "Error generando certificado."),
     };
   }
 }

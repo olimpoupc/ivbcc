@@ -8,8 +8,17 @@ import {
   AdminMetricCard,
   AdminPageHeader,
   AdminPageShell,
+  AdminPagination,
+  AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import {
+  buildListHref,
+  getPageParam,
+  getPageRange,
+  getParam,
+  type AdminListSearchParams,
+} from "@/lib/admin-query";
 import DeletePublicationButton from "./DeletePublicationButton";
 import PublishPublicationButton from "./PublishPublicationButton";
 
@@ -37,6 +46,14 @@ const categoryConfig = {
 const publicationSelect =
   "id,title,slug,summary,content,image_url,file_url,status,category,featured,published_at,created_at";
 
+const statusFilters = [
+  { label: "Todas", value: "all" },
+  { label: "Publicadas", value: "published" },
+  { label: "Borradores", value: "draft" },
+];
+
+const PAGE_SIZE = 9;
+
 function formatDateTimeColombia(value?: string | null) {
   if (!value) return "Sin fecha";
 
@@ -47,22 +64,77 @@ function formatDateTimeColombia(value?: string | null) {
   }).format(new Date(value));
 }
 
-export default async function AdminPublicacionesPage() {
+type Props = {
+  searchParams?: Promise<AdminListSearchParams>;
+};
+
+export default async function AdminPublicacionesPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const query = getParam(params, "q")?.trim() || "";
+  const selectedStatus = getParam(params, "status") || "all";
+  const page = getPageParam(params);
+  const { from, to } = getPageRange(page, PAGE_SIZE);
+
   const supabase = await createSupabaseServerClient();
-  const { data: publications } = await supabase
+
+  let dataQuery = supabase
     .from("publications")
     .select(publicationSelect)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
-  const publishedCount =
-    publications?.filter(
-      (publication) => (publication.status || "draft") === "published"
-    ).length || 0;
-  const draftCount =
-    publications?.filter((publication) => (publication.status || "draft") === "draft")
-      .length || 0;
-  const featuredCount =
-    publications?.filter((publication) => publication.featured).length || 0;
+  let filteredCountQuery = supabase
+    .from("publications")
+    .select("*", { count: "exact", head: true });
+
+  if (selectedStatus !== "all") {
+    dataQuery = dataQuery.eq("status", selectedStatus);
+    filteredCountQuery = filteredCountQuery.eq("status", selectedStatus);
+  }
+
+  if (query) {
+    const orFilter = `title.ilike.%${query}%,slug.ilike.%${query}%`;
+    dataQuery = dataQuery.or(orFilter);
+    filteredCountQuery = filteredCountQuery.or(orFilter);
+  }
+
+  const [
+    { data: publications, error },
+    { count: filteredCount },
+    { count: totalCount },
+    { count: publishedCount },
+    { count: draftCount },
+    { count: featuredCount },
+  ] = await Promise.all([
+    dataQuery,
+    filteredCountQuery,
+    supabase.from("publications").select("*", { count: "exact", head: true }),
+    supabase
+      .from("publications")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "published"),
+    supabase
+      .from("publications")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "draft"),
+    supabase
+      .from("publications")
+      .select("*", { count: "exact", head: true })
+      .eq("featured", true),
+  ]);
+
+  if (error) {
+    return <main className="p-8 text-sm text-gray-500">Error cargando publicaciones.</main>;
+  }
+
+  const totalItems = filteredCount || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/publicaciones", {
+      q: query || undefined,
+      status: selectedStatus !== "all" ? selectedStatus : undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
 
   return (
     <AdminPageShell>
@@ -81,33 +153,83 @@ export default async function AdminPublicacionesPage() {
       <section className="grid gap-4 md:grid-cols-4">
         <AdminMetricCard
           label="Publicaciones"
-          value={publications?.length || 0}
+          value={totalCount || 0}
           detail="Contenido registrado"
           icon="file"
           tone="slate"
         />
         <AdminMetricCard
           label="Publicadas"
-          value={publishedCount}
+          value={publishedCount || 0}
           detail="Visibles en el sitio"
           icon="check"
           tone="gold"
         />
         <AdminMetricCard
           label="Borradores"
-          value={draftCount}
+          value={draftCount || 0}
           detail="Pendientes"
           icon="activity"
           tone="navy"
         />
         <AdminMetricCard
           label="Destacadas"
-          value={featuredCount}
+          value={featuredCount || 0}
           detail="Marcadas como prioridad"
           icon="spark"
           tone="slate"
         />
       </section>
+
+      <AdminPanelCard>
+        <form className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="flex-1">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
+              Buscar por título o slug
+            </label>
+            <input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Escribe para encontrar una publicación"
+              className="h-12 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+            />
+          </div>
+
+          <input type="hidden" name="status" value={selectedStatus} />
+
+          <button
+            type="submit"
+            className="h-12 rounded-full bg-[var(--ivbcc-navy)] px-6 text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
+          >
+            Buscar
+          </button>
+        </form>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {statusFilters.map((filter) => {
+            const href = buildListHref("/admin/publicaciones", {
+              q: query || undefined,
+              status: filter.value !== "all" ? filter.value : undefined,
+            });
+            const isActive = selectedStatus === filter.value;
+
+            return (
+              <Link
+                key={filter.value}
+                href={href}
+                className={`rounded-full border px-4 py-2 text-sm font-extrabold transition ${
+                  isActive
+                    ? "border-[var(--ivbcc-gold)] bg-[var(--ivbcc-gold)] text-[var(--ivbcc-navy)]"
+                    : "border-[var(--ivbcc-line)] bg-white/70 text-[var(--ivbcc-muted)] hover:bg-white"
+                }`}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </div>
+      </AdminPanelCard>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {publications?.map((publication, index) => {
@@ -216,8 +338,16 @@ export default async function AdminPublicacionesPage() {
         {publications?.length === 0 && (
           <div className="md:col-span-2 xl:col-span-3">
             <AdminEmptyState
-              title="Aún no hay publicaciones registradas"
-              description="Crea la primera publicación para alimentar el módulo público."
+              title={
+                query || selectedStatus !== "all"
+                  ? "No se encontraron publicaciones"
+                  : "Aún no hay publicaciones registradas"
+              }
+              description={
+                query || selectedStatus !== "all"
+                  ? "Ajusta la búsqueda o los filtros para ver otras publicaciones."
+                  : "Crea la primera publicación para alimentar el módulo público."
+              }
               icon="file"
               action={
                 <AdminActionButton href="/admin/publicaciones/crear" icon="plus" tone="gold">
@@ -228,6 +358,14 @@ export default async function AdminPublicacionesPage() {
           </div>
         )}
       </section>
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageSize={PAGE_SIZE}
+        buildHref={buildHref}
+      />
     </AdminPageShell>
   );
 }

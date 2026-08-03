@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { isClientRateLimited } from "@/lib/security";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import AuthFeedback from "@/components/AuthFeedback";
 import FormField from "@/components/ui/FormField";
 
@@ -29,6 +31,14 @@ export default function RecoverPasswordForm() {
       return;
     }
 
+    if (isClientRateLimited("recover-password", 5, 60 * 60 * 1000)) {
+      setFeedback({
+        type: "error",
+        message: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setFeedback({ type: "loading", message: "Enviando correo de recuperación..." });
 
@@ -42,7 +52,10 @@ export default function RecoverPasswordForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: error.message || "No pudimos enviar el correo de recuperación.",
+        message: getUserFacingErrorMessage(
+          error,
+          "No pudimos enviar el correo de recuperación."
+        ),
       });
       return;
     }

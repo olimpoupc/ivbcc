@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { saveQuiz } from "./actions";
 import { AdminPanelCard } from "@/components/admin/AdminPrimitives";
 import {
   AdminFormField,
@@ -320,39 +321,6 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
     return true;
   }
 
-  async function saveQuestionsAndOptions(targetQuizId: string) {
-    for (const question of questions) {
-      const { data: insertedQuestion, error: questionError } = await supabase
-        .from("quiz_questions")
-        .insert({
-          quiz_id: targetQuizId,
-          question_text: question.questionText.trim(),
-          order: Number(question.order),
-        })
-        .select("id")
-        .single();
-
-      if (questionError || !insertedQuestion) {
-        throw questionError || new Error("No se pudo crear la pregunta.");
-      }
-
-      const optionsPayload = question.options.map((option, index) => ({
-        question_id: insertedQuestion.id,
-        option_text: option.optionText.trim(),
-        is_correct: option.isCorrect,
-        order: Number(option.order || index + 1),
-      }));
-
-      const { error: optionsError } = await supabase
-        .from("quiz_options")
-        .insert(optionsPayload);
-
-      if (optionsError) {
-        throw optionsError;
-      }
-    }
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -360,62 +328,30 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
 
     setIsSubmitting(true);
 
-    try {
-      if (mode === "create") {
-        const { data: insertedQuiz, error } = await supabase
-          .from("quizzes")
-          .insert({
-            course_id: courseId,
-            lesson_id: lessonId || null,
-            title: title.trim(),
-            status,
-          })
-          .select("id")
-          .single();
+    const result = await saveQuiz({
+      quizId: mode === "edit" ? quizId! : null,
+      courseId,
+      lessonId: lessonId || null,
+      title: title.trim(),
+      status,
+      questions: questions.map((question) => ({
+        question_text: question.questionText.trim(),
+        order: Number(question.order),
+        options: question.options.map((option, index) => ({
+          option_text: option.optionText.trim(),
+          is_correct: option.isCorrect,
+          order: Number(option.order || index + 1),
+        })),
+      })),
+    });
 
-        if (error || !insertedQuiz) {
-          throw error || new Error("No se pudo crear el quiz.");
-        }
+    setIsSubmitting(false);
 
-        await saveQuestionsAndOptions(insertedQuiz.id);
-      } else {
-        const { error: quizError } = await supabase
-          .from("quizzes")
-          .update({
-            lesson_id: lessonId || null,
-            title: title.trim(),
-            status,
-          })
-          .eq("id", quizId)
-          .eq("course_id", courseId);
-
-        if (quizError) {
-          throw quizError;
-        }
-
-        const { error: deleteQuestionsError } = await supabase
-          .from("quiz_questions")
-          .delete()
-          .eq("quiz_id", quizId);
-
-        if (deleteQuestionsError) {
-          throw deleteQuestionsError;
-        }
-
-        await saveQuestionsAndOptions(quizId!);
-      }
-    } catch (error) {
-      alert(
-        mode === "create"
-          ? "No se pudo crear el quiz."
-          : "No se pudo actualizar el quiz."
-      );
-      console.error(error);
-      setIsSubmitting(false);
+    if (!result.success) {
+      alert(result.error);
       return;
     }
 
-    setIsSubmitting(false);
     alert(mode === "create" ? "Quiz creado correctamente" : "Quiz actualizado correctamente");
     router.push(`/admin/formacion/${courseId}/quizzes`);
     router.refresh();

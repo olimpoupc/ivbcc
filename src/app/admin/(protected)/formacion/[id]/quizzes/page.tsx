@@ -117,14 +117,16 @@ export default async function CursoQuizzesPage({ params }: Props) {
                   {quiz.lesson_id ? lessonsMap.get(quiz.lesson_id) || "Lección no encontrada" : "Quiz general"}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:col-span-2 lg:justify-end">
-                  {quiz.status === "draft" && <PublishQuizButton id={quiz.id} />}
+                  {quiz.status === "draft" && (
+                    <PublishQuizButton id={quiz.id} courseId={id} />
+                  )}
                   <Link
                     href={`/admin/formacion/${id}/quizzes/${quiz.id}/editar`}
                     className="rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] hover:opacity-90"
                   >
                     Editar
                   </Link>
-                  <DeleteQuizButton id={quiz.id} />
+                  <DeleteQuizButton id={quiz.id} courseId={id} />
                 </div>
               </article>
             );

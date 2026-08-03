@@ -359,7 +359,7 @@ export default function SiteSettingsForm({ initialSettings }: Props) {
             className={adminFileInputClass}
           />
           <p className="mt-2 text-xs font-semibold text-[var(--ivbcc-muted)]">
-            Formatos permitidos: JPG, PNG, WEBP o SVG. Tamaño máximo: 5MB.
+            Formatos permitidos: JPG, PNG o WEBP. Tamaño máximo: 2MB.
           </p>
 
           {logoFile && (

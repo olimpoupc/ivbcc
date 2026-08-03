@@ -1,16 +1,24 @@
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import {
   AdminActionButton,
   AdminEmptyState,
   AdminMetricCard,
   AdminPageHeader,
   AdminPageShell,
+  AdminPagination,
   AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import {
+  buildListHref,
+  getPageParam,
+  getPageRange,
+  getParam,
+  type AdminListSearchParams,
+} from "@/lib/admin-query";
 import DeleteNewsButton from "./DeleteNewsButton";
 import PublishNewsButton from "./PublishNewsButton";
 
@@ -39,6 +47,8 @@ const statusFilters = [
   { label: "Borradores", value: "draft" },
 ];
 
+const PAGE_SIZE = 9;
+
 function formatDateTimeColombia(value?: string | null) {
   if (!value) return "Sin fecha";
 
@@ -50,41 +60,78 @@ function formatDateTimeColombia(value?: string | null) {
 }
 
 type Props = {
-  searchParams?: Promise<{
-    q?: string;
-    status?: string;
-  }>;
+  searchParams?: Promise<AdminListSearchParams>;
 };
 
 export default async function AdminNoticiasPage({ searchParams }: Props) {
   const params = await searchParams;
-  const query = params?.q?.trim() || "";
-  const selectedStatus = params?.status || "all";
+  const query = getParam(params, "q")?.trim() || "";
+  const selectedStatus = getParam(params, "status") || "all";
+  const page = getPageParam(params);
+  const { from, to } = getPageRange(page, PAGE_SIZE);
 
-  const { data: noticias } = await supabase
+  const supabase = await createSupabaseServerClient();
+
+  let dataQuery = supabase
     .from("news")
     .select(newsSelect)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
-  const filteredNoticias = noticias?.filter((noticia) => {
-    const status = noticia.status || "published";
-    const matchesStatus =
-      selectedStatus === "all" || status === selectedStatus;
-    const normalizedQuery = query.toLowerCase();
-    const matchesQuery =
-      !normalizedQuery ||
-      noticia.title?.toLowerCase().includes(normalizedQuery) ||
-      noticia.slug?.toLowerCase().includes(normalizedQuery);
+  let filteredCountQuery = supabase
+    .from("news")
+    .select("*", { count: "exact", head: true });
 
-    return matchesStatus && matchesQuery;
-  });
+  if (selectedStatus !== "all") {
+    if (selectedStatus === "published") {
+      dataQuery = dataQuery.or("status.eq.published,status.is.null");
+      filteredCountQuery = filteredCountQuery.or(
+        "status.eq.published,status.is.null"
+      );
+    } else {
+      dataQuery = dataQuery.eq("status", selectedStatus);
+      filteredCountQuery = filteredCountQuery.eq("status", selectedStatus);
+    }
+  }
 
-  const publishedCount =
-    noticias?.filter((noticia) => (noticia.status || "published") === "published")
-      .length || 0;
-  const draftCount =
-    noticias?.filter((noticia) => (noticia.status || "published") === "draft")
-      .length || 0;
+  if (query) {
+    const orFilter = `title.ilike.%${query}%,slug.ilike.%${query}%`;
+    dataQuery = dataQuery.or(orFilter);
+    filteredCountQuery = filteredCountQuery.or(orFilter);
+  }
+
+  const [
+    { data: noticias, error },
+    { count: filteredCount },
+    { count: totalCount },
+    { count: publishedCount },
+    { count: draftCount },
+  ] = await Promise.all([
+    dataQuery,
+    filteredCountQuery,
+    supabase.from("news").select("*", { count: "exact", head: true }),
+    supabase
+      .from("news")
+      .select("*", { count: "exact", head: true })
+      .or("status.eq.published,status.is.null"),
+    supabase
+      .from("news")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "draft"),
+  ]);
+
+  if (error) {
+    return <main className="p-8 text-sm text-gray-500">Error cargando noticias.</main>;
+  }
+
+  const totalItems = filteredCount || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/noticias", {
+      q: query || undefined,
+      status: selectedStatus !== "all" ? selectedStatus : undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
 
   return (
     <AdminPageShell>
@@ -103,21 +150,21 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
       <section className="grid gap-4 md:grid-cols-3">
         <AdminMetricCard
           label="Noticias totales"
-          value={noticias?.length || 0}
+          value={totalCount || 0}
           detail="Entradas registradas"
           icon="news"
           tone="slate"
         />
         <AdminMetricCard
           label="Publicadas"
-          value={publishedCount}
+          value={publishedCount || 0}
           detail="Visibles en el sitio"
           icon="check"
           tone="gold"
         />
         <AdminMetricCard
           label="Borradores"
-          value={draftCount}
+          value={draftCount || 0}
           detail="Pendientes de publicar"
           icon="file"
           tone="navy"
@@ -151,12 +198,10 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
 
         <div className="mt-5 flex flex-wrap gap-2">
           {statusFilters.map((filter) => {
-            const href =
-              filter.value === "all"
-                ? `/admin/noticias${query ? `?q=${encodeURIComponent(query)}` : ""}`
-                : `/admin/noticias?status=${filter.value}${
-                    query ? `&q=${encodeURIComponent(query)}` : ""
-                  }`;
+            const href = buildListHref("/admin/noticias", {
+              q: query || undefined,
+              status: filter.value !== "all" ? filter.value : undefined,
+            });
             const isActive = selectedStatus === filter.value;
 
             return (
@@ -177,7 +222,7 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
       </AdminPanelCard>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {filteredNoticias?.map((noticia, index) => {
+        {noticias?.map((noticia, index) => {
           const status = noticia.status || "published";
           const currentStatus =
             statusConfig[status as keyof typeof statusConfig] ||
@@ -256,11 +301,19 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
           );
         })}
 
-        {filteredNoticias?.length === 0 && (
+        {noticias?.length === 0 && (
           <div className="md:col-span-2 xl:col-span-3">
             <AdminEmptyState
-              title="No se encontraron noticias"
-              description="Ajusta los filtros o crea una nueva noticia para el sitio público."
+              title={
+                query || selectedStatus !== "all"
+                  ? "No se encontraron noticias"
+                  : "Aún no hay noticias registradas"
+              }
+              description={
+                query || selectedStatus !== "all"
+                  ? "Ajusta los filtros o crea una nueva noticia para el sitio público."
+                  : "Crea la primera noticia para el módulo público."
+              }
               icon="news"
               action={
                 <AdminActionButton href="/admin/noticias/crear" icon="plus" tone="gold">
@@ -271,6 +324,14 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
           </div>
         )}
       </section>
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageSize={PAGE_SIZE}
+        buildHref={buildHref}
+      />
     </AdminPageShell>
   );
 }

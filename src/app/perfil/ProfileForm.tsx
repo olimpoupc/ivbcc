@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AuthFeedback from "@/components/AuthFeedback";
 import { supabase } from "@/lib/supabase";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import FormField from "@/components/ui/FormField";
 
 type ProfileFormValues = {
@@ -72,7 +73,7 @@ export default function ProfileForm({ initialProfile }: Props) {
       console.error(error);
       setFeedback({
         type: "error",
-        message: error.message || "No pudimos actualizar tu perfil.",
+        message: getUserFacingErrorMessage(error, "No pudimos actualizar tu perfil."),
       });
       return;
     }

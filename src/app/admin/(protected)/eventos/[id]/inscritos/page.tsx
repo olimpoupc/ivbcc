@@ -1,5 +1,12 @@
-import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  AdminActionButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPageHeader,
+  AdminPageShell,
+  AdminPanelCard,
+} from "@/components/admin/AdminPrimitives";
 import DownloadRegistrationsCsvButton from "./DownloadRegistrationsCsvButton";
 
 type Props = {
@@ -33,50 +40,64 @@ export default async function EventoInscritosPage({ params }: Props) {
     ]);
 
   if (eventError || !evento) {
-    return <main className="p-10">Evento no encontrado.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Eventos"
+          title="Evento no encontrado"
+          icon="calendar"
+          actions={
+            <AdminActionButton href="/admin/eventos" icon="arrow" tone="outline">
+              Volver a eventos
+            </AdminActionButton>
+          }
+        />
+      </AdminPageShell>
+    );
   }
 
   if (registrationsError) {
-    return <main className="p-10">Error cargando inscritos.</main>;
+    return (
+      <AdminPageShell>
+        <AdminPageHeader
+          eyebrow="Eventos"
+          title="Inscritos del evento"
+          subtitle="No fue posible cargar los inscritos."
+          icon="calendar"
+        />
+      </AdminPageShell>
+    );
   }
 
   return (
-    <main className="space-y-7">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-[var(--ivbcc-gold)]">
-            Eventos
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-950">
-            Inscritos del evento
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">{evento.title}</p>
-        </div>
+    <AdminPageShell>
+      <AdminPageHeader
+        eyebrow="Eventos"
+        title="Inscritos del evento"
+        subtitle={evento.title}
+        icon="calendar"
+        actions={
+          <>
+            <DownloadRegistrationsCsvButton registrations={inscritos || []} />
+            <AdminActionButton href="/admin/eventos" icon="arrow" tone="outline">
+              Volver a eventos
+            </AdminActionButton>
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap gap-3">
-          <DownloadRegistrationsCsvButton registrations={inscritos || []} />
-          <Link
-            href="/admin/eventos"
-            className="inline-flex w-fit items-center justify-center rounded-lg border px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
-          >
-            Volver a eventos
-          </Link>
-        </div>
-      </div>
-
-      <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <article className="rounded-xl bg-white p-6 shadow-sm">
-          <p className="text-3xl font-bold text-gray-950">
-            {inscritos?.length || 0}
-          </p>
-          <p className="mt-2 text-sm font-medium text-gray-500">
-            Total de inscritos
-          </p>
-        </article>
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          label="Total de inscritos"
+          value={inscritos?.length || 0}
+          detail="Registros recibidos"
+          icon="users"
+          tone="slate"
+        />
       </section>
 
-      <section className="overflow-hidden rounded-xl bg-white shadow-sm">
-        <div className="grid grid-cols-12 border-b bg-gray-50 px-5 py-3 text-sm font-semibold text-gray-600">
+      <AdminPanelCard className="overflow-hidden p-0">
+        <div className="hidden grid-cols-12 border-b border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] px-5 py-3 text-sm font-extrabold text-[var(--ivbcc-muted)] lg:grid">
           <div className="col-span-3">Nombre completo</div>
           <div className="col-span-3">Correo</div>
           <div className="col-span-2">Teléfono</div>
@@ -87,26 +108,30 @@ export default async function EventoInscritosPage({ params }: Props) {
           inscritos.map((inscrito) => (
             <article
               key={inscrito.id}
-              className="grid grid-cols-12 items-center border-b px-5 py-4 text-sm"
+              className="grid gap-2 border-b border-[var(--ivbcc-line)] px-5 py-4 text-sm lg:grid-cols-12 lg:items-center lg:gap-0"
             >
-              <div className="col-span-3 font-semibold text-gray-900">
+              <div className="font-extrabold text-[var(--ivbcc-ink)] lg:col-span-3">
                 {inscrito.full_name}
               </div>
-              <div className="col-span-3 text-gray-600">{inscrito.email}</div>
-              <div className="col-span-2 text-gray-600">
+              <div className="text-[var(--ivbcc-muted)] lg:col-span-3">{inscrito.email}</div>
+              <div className="text-[var(--ivbcc-muted)] lg:col-span-2">
                 {inscrito.phone || "Sin teléfono"}
               </div>
-              <div className="col-span-4 text-gray-600">
+              <div className="text-[var(--ivbcc-muted)] lg:col-span-4">
                 {formatDateTimeColombia(inscrito.created_at)}
               </div>
             </article>
           ))
         ) : (
-          <div className="px-5 py-12 text-center text-sm text-gray-500">
-            Este evento aún no tiene inscritos.
+          <div className="p-6">
+            <AdminEmptyState
+              title="Este evento aún no tiene inscritos"
+              description="Cuando alguien se inscriba desde la página pública, aparecerá aquí."
+              icon="users"
+            />
           </div>
         )}
-      </section>
-    </main>
+      </AdminPanelCard>
+    </AdminPageShell>
   );
 }

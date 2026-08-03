@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
@@ -8,18 +9,13 @@ import {
   AdminSection,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
-import { supabase } from "@/lib/supabase";
-
-type ChatbotCategory =
-  | "general"
-  | "schedules"
-  | "events"
-  | "formation"
-  | "live"
-  | "location"
-  | "contact"
-  | "prayer"
-  | "whatsapp";
+import {
+  createChatbotItem,
+  deleteChatbotItem,
+  toggleChatbotItem,
+  updateChatbotItem,
+  type ChatbotCategory,
+} from "./actions";
 
 export type ChatbotItemRow = {
   id: string;
@@ -79,9 +75,6 @@ const categoryLabels = Object.fromEntries(
   categoryOptions.map((category) => [category.value, category.label])
 ) as Record<ChatbotCategory, string>;
 
-const chatbotItemSelect =
-  "id,title,message,category,button_text,button_url,order_index,is_active,created_at,updated_at";
-
 function toFormState(item: ChatbotItemRow): FormState {
   return {
     title: item.title,
@@ -105,7 +98,8 @@ function sortItems(items: ChatbotItemRow[]) {
 }
 
 export default function ChatbotItemsPanel({ initialItems }: Props) {
-  const [items, setItems] = useState(() => sortItems(initialItems));
+  const router = useRouter();
+  const sortedItems = useMemo(() => sortItems(initialItems), [initialItems]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [feedback, setFeedback] = useState<Feedback>({
@@ -114,7 +108,6 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  const sortedItems = useMemo(() => sortItems(items), [items]);
   const isEditing = Boolean(editingId);
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -135,23 +128,12 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const title = form.title.trim();
-    const message = form.message.trim();
-
-    if (!title || !message) {
-      setFeedback({
-        type: "error",
-        message: "Título y mensaje son obligatorios.",
-      });
-      return;
-    }
-
-    const payload = {
-      title,
-      message,
+    const input = {
+      title: form.title,
+      message: form.message,
       category: form.category,
-      button_text: form.button_text.trim() || null,
-      button_url: form.button_url.trim() || null,
+      button_text: form.button_text,
+      button_url: form.button_url,
       order_index: Number(form.order_index) || 0,
       is_active: form.is_active,
     };
@@ -159,62 +141,25 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setIsSaving(true);
     setFeedback({ type: "info", message: "Guardando respuesta..." });
 
-    if (editingId) {
-      const { data, error } = await supabase
-        .from("chatbot_items")
-        .update(payload)
-        .eq("id", editingId)
-        .select(chatbotItemSelect)
-        .maybeSingle();
-
-      setIsSaving(false);
-
-      if (error || !data) {
-        console.error(error);
-        setFeedback({
-          type: "error",
-          message: error?.message || "No se pudo actualizar la respuesta.",
-        });
-        return;
-      }
-
-      const updatedItem = data as ChatbotItemRow;
-      setItems((current) =>
-        sortItems(
-          current.map((item) => (item.id === editingId ? updatedItem : item))
-        )
-      );
-      resetForm();
-      setFeedback({
-        type: "success",
-        message: "Respuesta actualizada correctamente.",
-      });
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("chatbot_items")
-      .insert(payload)
-      .select(chatbotItemSelect)
-      .maybeSingle();
+    const result = editingId
+      ? await updateChatbotItem(editingId, input)
+      : await createChatbotItem(input);
 
     setIsSaving(false);
 
-    if (error || !data) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message: error?.message || "No se pudo crear la respuesta.",
-      });
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
 
-    const createdItem = data as ChatbotItemRow;
-    setItems((current) => sortItems([...current, createdItem]));
+    const wasEditing = isEditing;
     resetForm();
+    router.refresh();
     setFeedback({
       type: "success",
-      message: "Respuesta creada correctamente.",
+      message: wasEditing
+        ? "Respuesta actualizada correctamente."
+        : "Respuesta creada correctamente.",
     });
   }
 
@@ -222,33 +167,21 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setIsSaving(true);
     setFeedback({ type: "info", message: "Actualizando estado..." });
 
-    const { data, error } = await supabase
-      .from("chatbot_items")
-      .update({ is_active: !item.is_active })
-      .eq("id", item.id)
-      .select(chatbotItemSelect)
-      .maybeSingle();
+    const result = await toggleChatbotItem(item.id, !item.is_active);
 
     setIsSaving(false);
 
-    if (error || !data) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message: error?.message || "No se pudo cambiar el estado.",
-      });
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
 
-    const updatedItem = data as ChatbotItemRow;
-    setItems((current) =>
-      sortItems(current.map((row) => (row.id === item.id ? updatedItem : row)))
-    );
+    router.refresh();
     setFeedback({
       type: "success",
-      message: updatedItem.is_active
-        ? "Respuesta activada correctamente."
-        : "Respuesta desactivada correctamente.",
+      message: item.is_active
+        ? "Respuesta desactivada correctamente."
+        : "Respuesta activada correctamente.",
     });
   }
 
@@ -259,28 +192,20 @@ export default function ChatbotItemsPanel({ initialItems }: Props) {
     setIsSaving(true);
     setFeedback({ type: "info", message: "Eliminando respuesta..." });
 
-    const { error } = await supabase
-      .from("chatbot_items")
-      .delete()
-      .eq("id", item.id);
+    const result = await deleteChatbotItem(item.id);
 
     setIsSaving(false);
 
-    if (error) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message: error.message || "No se pudo eliminar la respuesta.",
-      });
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
-
-    setItems((current) => current.filter((row) => row.id !== item.id));
 
     if (editingId === item.id) {
       resetForm();
     }
 
+    router.refresh();
     setFeedback({
       type: "success",
       message: "Respuesta eliminada correctamente.",

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import AuthFeedback from "@/components/AuthFeedback";
 import FormField from "@/components/ui/FormField";
 
@@ -91,7 +92,7 @@ export default function UpdatePasswordForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: error.message || "No pudimos actualizar la contraseña.",
+        message: getUserFacingErrorMessage(error, "No pudimos actualizar la contraseña."),
       });
       return;
     }

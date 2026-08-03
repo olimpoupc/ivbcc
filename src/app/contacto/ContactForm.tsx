@@ -7,6 +7,7 @@ import {
   sanitizeMultilineText,
   sanitizeText,
 } from "@/lib/security";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import AuthFeedback from "@/components/AuthFeedback";
 
 type ContactCategory =
@@ -106,7 +107,7 @@ export default function ContactForm() {
       console.error(error);
       setFeedback({
         type: "error",
-        message: error.message || "No pudimos enviar tu mensaje.",
+        message: getUserFacingErrorMessage(error, "No pudimos enviar tu mensaje."),
       });
       return;
     }

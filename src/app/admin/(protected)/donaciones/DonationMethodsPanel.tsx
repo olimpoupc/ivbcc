@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
@@ -9,8 +10,12 @@ import {
   AdminSection,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
-import { supabase } from "@/lib/supabase";
-import { buildSafeStoragePath, validateImageFile } from "@/lib/security";
+import { validateImageFile } from "@/lib/security";
+import {
+  deleteDonationMethod,
+  saveDonationMethod,
+  toggleDonationMethod,
+} from "./actions";
 
 type DonationMethodType =
   | "nequi"
@@ -85,9 +90,6 @@ const fixedBankNames: Partial<Record<DonationMethodType, string>> = {
 const brebSuggestedInstructions =
   "Desde tu banco, entra a Bre-B, elige enviar a una llave, ingresa la llave registrada y confirma el aporte.";
 
-const donationMethodSelect =
-  "id,title,method_type,description,account_holder,account_number,bank_name,document_number,phone,qr_image_url,payment_url,instructions,order_index,is_active,created_at,updated_at";
-
 const emptyForm: DonationMethodFormState = {
   title: "",
   method_type: "nequi",
@@ -147,29 +149,14 @@ function toFormState(method: DonationMethodRow): DonationMethodFormState {
   };
 }
 
-function nullableText(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function getStoragePathFromPublicUrl(value?: string | null) {
-  if (!value) return null;
-  const marker = "/storage/v1/object/public/news-images/";
-  const index = value.indexOf(marker);
-  return index >= 0 ? value.slice(index + marker.length) : null;
-}
-
-function buildQrPath(file: File) {
-  return buildSafeStoragePath("donations/qr", file);
-}
-
 export default function DonationMethodsPanel({
   initialMethods,
 }: {
   initialMethods: DonationMethodRow[];
 }) {
-  const [methods, setMethods] = useState(initialMethods);
+  const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previousQrImageUrl, setPreviousQrImageUrl] = useState<string | null>(null);
   const [form, setForm] = useState<DonationMethodFormState>(emptyForm);
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
@@ -218,6 +205,7 @@ export default function DonationMethodsPanel({
 
   function resetForm() {
     setEditingId(null);
+    setPreviousQrImageUrl(null);
     setForm(emptyForm);
     setQrFile(null);
     setQrPreviewUrl(null);
@@ -230,6 +218,7 @@ export default function DonationMethodsPanel({
 
   function startEdit(method: DonationMethodRow) {
     setEditingId(method.id);
+    setPreviousQrImageUrl(method.qr_image_url);
     setForm(toFormState(method));
     setQrFile(null);
     setQrPreviewUrl(null);
@@ -266,130 +255,54 @@ export default function DonationMethodsPanel({
     setQrPreviewUrl(previewUrl);
   }
 
-  async function uploadQrIfNeeded() {
-    if (!qrFile) return form.qr_image_url.trim() || null;
-
-    const qrPath = buildQrPath(qrFile);
-    const { error: uploadError } = await supabase.storage
-      .from("news-images")
-      .upload(qrPath, qrFile, {
-        contentType: qrFile.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage.from("news-images").getPublicUrl(qrPath);
-    return data.publicUrl;
-  }
-
-  async function removeQrFromStorage(url?: string | null) {
-    const storagePath = getStoragePathFromPublicUrl(url);
-    if (!storagePath) return;
-
-    const { error } = await supabase.storage.from("news-images").remove([storagePath]);
-    if (error) console.error(error);
-  }
-
-  function buildPayload(qrImageUrl: string | null) {
-    return {
-      title: form.title.trim(),
-      method_type: form.method_type,
-      description: nullableText(form.description),
-      account_holder: nullableText(form.account_holder),
-      account_number: nullableText(form.account_number),
-      bank_name: nullableText(form.bank_name),
-      document_number: nullableText(form.document_number),
-      phone: nullableText(form.phone),
-      qr_image_url: qrImageUrl,
-      payment_url: nullableText(form.payment_url),
-      instructions: nullableText(form.instructions),
-      order_index: Number.parseInt(form.order_index, 10) || 0,
-      is_active: form.is_active,
-    };
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setFeedback({ type: "info", message: "Guardando método..." });
 
-    try {
-      const previousMethod = editingId
-        ? methods.find((method) => method.id === editingId) || null
-        : null;
-      const qrImageUrl = await uploadQrIfNeeded();
-      const payload = buildPayload(qrImageUrl);
+    const formData = new FormData();
+    if (editingId) formData.set("id", editingId);
+    formData.set("title", form.title);
+    formData.set("method_type", form.method_type);
+    formData.set("description", form.description);
+    formData.set("account_holder", form.account_holder);
+    formData.set("account_number", form.account_number);
+    formData.set("bank_name", form.bank_name);
+    formData.set("document_number", form.document_number);
+    formData.set("phone", form.phone);
+    formData.set("qr_image_url", form.qr_image_url);
+    formData.set("previous_qr_image_url", previousQrImageUrl || "");
+    formData.set("payment_url", form.payment_url);
+    formData.set("instructions", form.instructions);
+    formData.set("order_index", form.order_index);
+    formData.set("is_active", String(form.is_active));
+    if (qrFile) formData.set("qrFile", qrFile);
 
-      const query = editingId
-        ? supabase
-            .from("donation_methods")
-            .update(payload)
-            .eq("id", editingId)
-            .select(donationMethodSelect)
-            .maybeSingle()
-        : supabase
-            .from("donation_methods")
-            .insert(payload)
-            .select(donationMethodSelect)
-            .maybeSingle();
+    const result = await saveDonationMethod(formData);
 
-      const { data, error } = await query;
+    setIsSubmitting(false);
 
-      if (error || !data) {
-        throw error || new Error("No se pudo guardar el método.");
-      }
-
-      if (qrFile && previousMethod?.qr_image_url) {
-        await removeQrFromStorage(previousMethod.qr_image_url);
-      }
-
-      setMethods((current) => {
-        const next = editingId
-          ? current.map((method) => (method.id === editingId ? data : method))
-          : [data, ...current];
-
-        return [...next].sort(
-          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-        );
-      });
-      resetForm();
-      setFeedback({ type: "success", message: "Método guardado correctamente." });
-    } catch (error) {
-      console.error(error);
-      setFeedback({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "No pudimos guardar el método.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function toggleActive(method: DonationMethodRow) {
-    const { data, error } = await supabase
-      .from("donation_methods")
-      .update({ is_active: !(method.is_active ?? true) })
-      .eq("id", method.id)
-      .select(donationMethodSelect)
-      .maybeSingle();
-
-    if (error || !data) {
-      setFeedback({
-        type: "error",
-        message: error?.message || "No pudimos cambiar el estado.",
-      });
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
 
-    setMethods((current) =>
-      current.map((item) => (item.id === method.id ? data : item))
-    );
+    resetForm();
+    router.refresh();
+    setFeedback({ type: "success", message: "Método guardado correctamente." });
+  }
+
+  async function toggleActive(method: DonationMethodRow) {
+    setFeedback({ type: "info", message: "Actualizando estado..." });
+
+    const result = await toggleDonationMethod(method.id, !(method.is_active ?? true));
+
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    router.refresh();
     setFeedback({ type: "success", message: "Estado actualizado." });
   }
 
@@ -397,22 +310,17 @@ export default function DonationMethodsPanel({
     const confirmed = confirm(`¿Eliminar el método "${method.title}"?`);
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("donation_methods")
-      .delete()
-      .eq("id", method.id);
+    setFeedback({ type: "info", message: "Eliminando método..." });
 
-    if (error) {
-      setFeedback({
-        type: "error",
-        message: error.message || "No pudimos eliminar el método.",
-      });
+    const result = await deleteDonationMethod(method.id, method.qr_image_url);
+
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
       return;
     }
 
-    await removeQrFromStorage(method.qr_image_url);
-    setMethods((current) => current.filter((item) => item.id !== method.id));
     if (editingId === method.id) resetForm();
+    router.refresh();
     setFeedback({ type: "success", message: "Método eliminado." });
   }
 
@@ -633,7 +541,7 @@ export default function DonationMethodsPanel({
         <AdminPanelCard>
 
         <div className="space-y-4">
-          {methods.map((method) => (
+          {initialMethods.map((method) => (
             <div
               key={method.id}
               className="rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4"
@@ -692,7 +600,7 @@ export default function DonationMethodsPanel({
           ))}
         </div>
 
-        {methods.length === 0 ? (
+        {initialMethods.length === 0 ? (
           <AdminEmptyState
             title="Aún no hay métodos configurados"
             description="Crea el primer método para activar la página pública de donaciones."

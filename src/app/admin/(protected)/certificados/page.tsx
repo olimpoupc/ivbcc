@@ -11,20 +11,33 @@ import {
   AdminMetricCard,
   AdminPageHeader,
   AdminPageShell,
+  AdminPagination,
   AdminPanelCard,
   AdminSection,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import {
+  buildListHref,
+  getPageParam,
+  getPageRange,
+  getParam,
+  type AdminListSearchParams,
+} from "@/lib/admin-query";
 import RevokeCertificateButton from "./RevokeCertificateButton";
 
+const PAGE_SIZE = 10;
+
 type Props = {
-  searchParams: Promise<{
-    course?: string;
-  }>;
+  searchParams: Promise<AdminListSearchParams>;
 };
 
 export default async function AdminCertificadosPage({ searchParams }: Props) {
-  const { course: selectedCourseId = "all" } = await searchParams;
+  const params = await searchParams;
+  const selectedCourseId = getParam(params, "course") || "all";
+  const query = getParam(params, "q")?.trim() || "";
+  const page = getPageParam(params);
+  const { from, to } = getPageRange(page, PAGE_SIZE);
+
   const supabase = await createSupabaseServerClient();
 
   const { data: courses } = await supabase
@@ -36,16 +49,64 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
       ? (courses || []).map((course) => course.id)
       : [selectedCourseId];
 
-  let certificatesQuery = supabase
+  let certificatesDataQuery = supabase
     .from("course_certificates")
     .select("id,code,user_id,student_name,course_title,course_id,issued_at,status")
-    .order("issued_at", { ascending: false });
+    .order("issued_at", { ascending: false })
+    .range(from, to);
+
+  let certificatesFilteredCountQuery = supabase
+    .from("course_certificates")
+    .select("*", { count: "exact", head: true });
+
+  let totalCountQuery = supabase
+    .from("course_certificates")
+    .select("*", { count: "exact", head: true });
+  let validCountQuery = supabase
+    .from("course_certificates")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "valid");
+  let revokedCountQuery = supabase
+    .from("course_certificates")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "revoked");
+  let courseBreakdownQuery = supabase
+    .from("course_certificates")
+    .select("course_title");
 
   if (selectedCourseId !== "all") {
-    certificatesQuery = certificatesQuery.eq("course_id", selectedCourseId);
+    certificatesDataQuery = certificatesDataQuery.eq("course_id", selectedCourseId);
+    certificatesFilteredCountQuery = certificatesFilteredCountQuery.eq(
+      "course_id",
+      selectedCourseId
+    );
+    totalCountQuery = totalCountQuery.eq("course_id", selectedCourseId);
+    validCountQuery = validCountQuery.eq("course_id", selectedCourseId);
+    revokedCountQuery = revokedCountQuery.eq("course_id", selectedCourseId);
+    courseBreakdownQuery = courseBreakdownQuery.eq("course_id", selectedCourseId);
   }
 
-  const { data: certificates, error } = await certificatesQuery;
+  if (query) {
+    const orFilter = `student_name.ilike.%${query}%,course_title.ilike.%${query}%,code.ilike.%${query}%`;
+    certificatesDataQuery = certificatesDataQuery.or(orFilter);
+    certificatesFilteredCountQuery = certificatesFilteredCountQuery.or(orFilter);
+  }
+
+  const [
+    { data: certificates, error },
+    { count: filteredCount },
+    { count: totalCertificates },
+    { count: validCertificates },
+    { count: revokedCertificates },
+    { data: courseBreakdownRows },
+  ] = await Promise.all([
+    certificatesDataQuery,
+    certificatesFilteredCountQuery,
+    totalCountQuery,
+    validCountQuery,
+    revokedCountQuery,
+    courseBreakdownQuery,
+  ]);
 
   if (error) {
     return (
@@ -60,17 +121,20 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
     );
   }
 
-  const totalCertificates = certificates?.length || 0;
-  const validCertificates =
-    certificates?.filter((certificate) => certificate.status === "valid").length || 0;
-  const revokedCertificates =
-    certificates?.filter((certificate) => certificate.status === "revoked").length || 0;
-  const certificatesByCourse = new Map<string, number>();
+  const totalItems = filteredCount || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/certificados", {
+      course: selectedCourseId !== "all" ? selectedCourseId : undefined,
+      q: query || undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
 
-  for (const certificate of certificates || []) {
+  const certificatesByCourse = new Map<string, number>();
+  for (const row of courseBreakdownRows || []) {
     certificatesByCourse.set(
-      certificate.course_title,
-      (certificatesByCourse.get(certificate.course_title) || 0) + 1
+      row.course_title,
+      (certificatesByCourse.get(row.course_title) || 0) + 1
     );
   }
 
@@ -120,11 +184,21 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
   ]);
   const coursesById = new Map((courses || []).map((course) => [course.id, course]));
   const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+
+  let certificateKeysQuery = supabase
+    .from("course_certificates")
+    .select("course_id,user_id");
+
+  if (selectedCourseId !== "all") {
+    certificateKeysQuery = certificateKeysQuery.eq("course_id", selectedCourseId);
+  }
+
+  const { data: certificateKeys } = await certificateKeysQuery;
   const certificatesByUserCourse = new Set(
-    (certificates || []).map(
-      (certificate) => `${certificate.course_id}:${certificate.user_id}`
-    )
+    (certificateKeys || []).map((cert) => `${cert.course_id}:${cert.user_id}`)
   );
+  const hasCertificateForUserCourse = (courseId: string, userId: string) =>
+    certificatesByUserCourse.has(`${courseId}:${userId}`);
 
   const completedWithoutCertificate: Array<{
     userId: string;
@@ -166,8 +240,9 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
       `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
       "Usuario sin nombre";
     const courseTitle = coursesById.get(enrollment.course_id)?.title || "Curso";
-    const hasCertificate = certificatesByUserCourse.has(
-      `${enrollment.course_id}:${enrollment.user_id}`
+    const hasCertificate = hasCertificateForUserCourse(
+      enrollment.course_id,
+      enrollment.user_id
     );
 
     if (!hasCertificate) {
@@ -195,13 +270,13 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
       />
 
       <AdminPanelCard>
-        <form className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <label className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
+        <form className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <label className="flex-1 text-sm font-extrabold text-[var(--ivbcc-ink)]">
             Filtrar por curso
             <select
               name="course"
               defaultValue={selectedCourseId}
-              className="mt-2 w-full min-w-72 rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+              className="mt-2 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
             >
               <option value="all">Todos los cursos</option>
               {(courses || []).map((course) => (
@@ -211,11 +286,23 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
               ))}
             </select>
           </label>
+
+          <label className="flex-1 text-sm font-extrabold text-[var(--ivbcc-ink)]">
+            Buscar por estudiante, curso o código
+            <input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Escribe para encontrar un certificado"
+              className="mt-2 h-12 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+            />
+          </label>
+
           <button
             type="submit"
-            className="rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[var(--ivbcc-navy-2)]"
+            className="h-12 rounded-full bg-[var(--ivbcc-navy)] px-6 text-sm font-extrabold text-white shadow-sm transition hover:bg-[var(--ivbcc-navy-2)]"
           >
-            Aplicar filtro
+            Aplicar filtros
           </button>
         </form>
       </AdminPanelCard>
@@ -223,21 +310,21 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <AdminMetricCard
           label="Total certificados"
-          value={totalCertificates}
+          value={totalCertificates || 0}
           detail="Emitidos en el sistema"
           icon="certificate"
           tone="slate"
         />
         <AdminMetricCard
           label="Válidos"
-          value={validCertificates}
+          value={validCertificates || 0}
           detail="Disponibles para verificar"
           icon="check"
           tone="gold"
         />
         <AdminMetricCard
           label="Revocados"
-          value={revokedCertificates}
+          value={revokedCertificates || 0}
           detail="Sin validez pública"
           icon="close"
           tone="slate"
@@ -365,12 +452,30 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
         ) : (
           <div className="p-6">
             <AdminEmptyState
-              title="Aún no hay certificados emitidos"
-              description="Cuando un estudiante complete su formación, los certificados aparecerán aquí."
+              title={
+                query
+                  ? "No se encontraron certificados"
+                  : "Aún no hay certificados emitidos"
+              }
+              description={
+                query
+                  ? "Ajusta la búsqueda o el curso seleccionado."
+                  : "Cuando un estudiante complete su formación, los certificados aparecerán aquí."
+              }
               icon="certificate"
             />
           </div>
         )}
+
+          <div className="p-5">
+            <AdminPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              buildHref={buildHref}
+            />
+          </div>
         </AdminPanelCard>
       </AdminSection>
     </AdminPageShell>

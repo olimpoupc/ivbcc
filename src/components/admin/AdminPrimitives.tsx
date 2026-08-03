@@ -293,6 +293,70 @@ export function AdminTable({
   );
 }
 
+export function AdminPagination({
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+  buildHref,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  buildHref: (page: number) => string;
+}) {
+  if (totalPages <= 1) return null;
+
+  const from = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalItems);
+  const isFirstPage = page <= 1;
+  const isLastPage = page >= totalPages;
+
+  return (
+    <nav
+      className="flex flex-col items-center justify-between gap-4 border-t border-[var(--ivbcc-line)] pt-6 sm:flex-row"
+      aria-label="Paginación"
+    >
+      <p className="text-sm text-[var(--ivbcc-muted)]">
+        Mostrando {from}–{to} de {totalItems}
+      </p>
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={buildHref(Math.max(1, page - 1))}
+          aria-disabled={isFirstPage}
+          tabIndex={isFirstPage ? -1 : undefined}
+          className={`rounded-full border px-4 py-2 text-sm font-extrabold transition ${
+            isFirstPage
+              ? "pointer-events-none border-[var(--ivbcc-line)] bg-white/40 text-[var(--ivbcc-muted)] opacity-50"
+              : "border-[var(--ivbcc-line)] bg-white text-[var(--ivbcc-ink)] hover:bg-[var(--ivbcc-paper)]"
+          }`}
+        >
+          Anterior
+        </Link>
+
+        <span className="px-2 text-sm font-extrabold text-[var(--ivbcc-ink)]">
+          Página {page} de {totalPages}
+        </span>
+
+        <Link
+          href={buildHref(Math.min(totalPages, page + 1))}
+          aria-disabled={isLastPage}
+          tabIndex={isLastPage ? -1 : undefined}
+          className={`rounded-full border px-4 py-2 text-sm font-extrabold transition ${
+            isLastPage
+              ? "pointer-events-none border-[var(--ivbcc-line)] bg-white/40 text-[var(--ivbcc-muted)] opacity-50"
+              : "border-[var(--ivbcc-line)] bg-white text-[var(--ivbcc-ink)] hover:bg-[var(--ivbcc-paper)]"
+          }`}
+        >
+          Siguiente
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
 export function AdminQuickAction({
   href,
   title,

@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useState, useTransition } from "react";
 import type { CertificateViewModel } from "@/lib/certificates";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { getOrCreateCourseCertificate } from "./certificate-actions";
 
 type Props = {
@@ -44,11 +45,8 @@ export default function CourseCertificateButton({
           lastName,
         });
       } catch (error) {
-        setMessage(
-          error instanceof Error
-            ? `Error generando certificado: ${error.message}`
-            : "Error generando certificado."
-        );
+        console.error(error);
+        setMessage(getUserFacingErrorMessage(error, "Error generando certificado."));
         return;
       }
 
