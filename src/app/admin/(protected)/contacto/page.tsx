@@ -4,10 +4,32 @@ import {
   AdminPageHeader,
   AdminPageShell,
 } from "@/components/admin/AdminPrimitives";
+import {
+  getPageParam,
+  getPageRange,
+  getParam,
+  type AdminListSearchParams,
+} from "@/lib/admin-query";
 import ContactMessagesPanel from "./ContactMessagesPanel";
 
 const contactMessageSelect =
   "id,full_name,email,phone,church_name,subject,category,message,status,admin_response,responded_at,updated_at,created_at";
+
+const replySelect =
+  "id,contact_message_id,subject,body,status,sent_by_email,error_message,created_at";
+
+const PAGE_SIZE = 10;
+
+const validStatuses = ["pending", "read", "responded", "archived"] as const;
+const validCategories = [
+  "general",
+  "counseling",
+  "formation",
+  "events",
+  "prayer",
+  "support",
+  "other",
+] as const;
 
 function formatDateColombia(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -19,21 +41,70 @@ function formatDateColombia(value?: string | null) {
   }).format(new Date(value));
 }
 
-const replySelect =
-  "id,contact_message_id,subject,body,status,sent_by_email,error_message,created_at";
+type Props = {
+  searchParams?: Promise<AdminListSearchParams>;
+};
 
-export default async function AdminContactoPage() {
+export default async function AdminContactoPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const query = getParam(params, "q")?.trim() || "";
+  const rawStatus = getParam(params, "status") || "all";
+  const rawCategory = getParam(params, "category") || "all";
+  const statusFilter = (validStatuses as readonly string[]).includes(rawStatus)
+    ? (rawStatus as (typeof validStatuses)[number])
+    : "all";
+  const categoryFilter = (validCategories as readonly string[]).includes(rawCategory)
+    ? (rawCategory as (typeof validCategories)[number])
+    : "all";
+  const page = getPageParam(params);
+  const { from, to } = getPageRange(page, PAGE_SIZE);
+
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: messages, error }, { data: replies }] = await Promise.all([
+  let dataQuery = supabase
+    .from("contact_messages")
+    .select(contactMessageSelect)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  let filteredCountQuery = supabase
+    .from("contact_messages")
+    .select("*", { count: "exact", head: true });
+
+  if (statusFilter !== "all") {
+    dataQuery = dataQuery.eq("status", statusFilter);
+    filteredCountQuery = filteredCountQuery.eq("status", statusFilter);
+  }
+
+  if (categoryFilter !== "all") {
+    dataQuery = dataQuery.eq("category", categoryFilter);
+    filteredCountQuery = filteredCountQuery.eq("category", categoryFilter);
+  }
+
+  if (query) {
+    const orFilter = `full_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%,subject.ilike.%${query}%,message.ilike.%${query}%`;
+    dataQuery = dataQuery.or(orFilter);
+    filteredCountQuery = filteredCountQuery.or(orFilter);
+  }
+
+  const [
+    { data: messages, error },
+    { count: filteredCount },
+    { count: totalCount },
+    { count: pendingCount },
+    { count: respondedCount },
+  ] = await Promise.all([
+    dataQuery,
+    filteredCountQuery,
+    supabase.from("contact_messages").select("*", { count: "exact", head: true }),
     supabase
       .from("contact_messages")
-      .select(contactMessageSelect)
-      .order("created_at", { ascending: false }),
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
     supabase
-      .from("contact_message_replies")
-      .select(replySelect)
-      .order("created_at", { ascending: false }),
+      .from("contact_messages")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "responded"),
   ]);
 
   if (error) {
@@ -48,6 +119,16 @@ export default async function AdminContactoPage() {
       </AdminPageShell>
     );
   }
+
+  const messageIds = (messages || []).map((message) => message.id);
+  const { data: replies } =
+    messageIds.length > 0
+      ? await supabase
+          .from("contact_message_replies")
+          .select(replySelect)
+          .in("contact_message_id", messageIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
   const repliesByMessageId = new Map<string, typeof replies>();
   for (const reply of replies || []) {
@@ -84,43 +165,52 @@ export default async function AdminContactoPage() {
     })),
   }));
 
-  const pendingMessages = rows.filter((message) => message.status === "pending").length;
-  const respondedMessages = rows.filter((message) => message.status === "responded").length;
+  const totalItems = filteredCount || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
   return (
     <AdminPageShell>
       <AdminPageHeader
         eyebrow="Bandeja administrativa"
         title="Contacto"
-        subtitle="Gestiona mensajes recibidos desde la página pública de contacto, revisa su estado y responde por correo o WhatsApp usando enlaces rápidos del navegador."
+        subtitle="Gestiona mensajes recibidos desde la página pública de contacto, revisa su estado y responde por correo o WhatsApp."
         icon="message"
       />
 
       <section className="grid gap-4 md:grid-cols-3">
         <AdminMetricCard
           label="Mensajes recibidos"
-          value={rows.length}
-          detail="Total histórico visible"
+          value={totalCount || 0}
+          detail="Total histórico"
           icon="message"
           tone="slate"
         />
         <AdminMetricCard
           label="Pendientes"
-          value={pendingMessages}
+          value={pendingCount || 0}
           detail="Requieren atención"
           icon="activity"
           tone="gold"
         />
         <AdminMetricCard
           label="Respondidos"
-          value={respondedMessages}
+          value={respondedCount || 0}
           detail="Seguimiento completado"
           icon="check"
           tone="navy"
         />
       </section>
 
-      <ContactMessagesPanel initialMessages={rows} />
+      <ContactMessagesPanel
+        messages={rows}
+        query={query}
+        statusFilter={statusFilter}
+        categoryFilter={categoryFilter}
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageSize={PAGE_SIZE}
+      />
     </AdminPageShell>
   );
 }

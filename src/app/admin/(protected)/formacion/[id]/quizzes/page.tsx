@@ -5,9 +5,16 @@ import {
   AdminEmptyState,
   AdminPageHeader,
   AdminPageShell,
+  AdminPagination,
   AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import {
+  buildListHref,
+  getPageParam,
+  getPageRange,
+  type AdminListSearchParams,
+} from "@/lib/admin-query";
 import DeleteQuizButton from "./DeleteQuizButton";
 import PublishQuizButton from "./PublishQuizButton";
 
@@ -22,26 +29,41 @@ const statusConfig = {
   },
 } as const;
 
+const PAGE_SIZE = 25;
+
 type Props = {
   params: Promise<{
     id: string;
   }>;
+  searchParams?: Promise<AdminListSearchParams>;
 };
 
-export default async function CursoQuizzesPage({ params }: Props) {
+export default async function CursoQuizzesPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const search = await searchParams;
+  const page = getPageParam(search);
+  const { from, to } = getPageRange(page, PAGE_SIZE);
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: course, error: courseError }, { data: lessons }, { data: quizzes, error: quizzesError }] =
-    await Promise.all([
-      supabase.from("courses").select("id,title").eq("id", id).maybeSingle(),
-      supabase.from("lessons").select("id,title").eq("course_id", id),
-      supabase
-        .from("quizzes")
-        .select("id,title,status,lesson_id,created_at")
-        .eq("course_id", id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: course, error: courseError },
+    { data: lessons },
+    { data: quizzes, error: quizzesError },
+    { count: totalCount },
+  ] = await Promise.all([
+    supabase.from("courses").select("id,title").eq("id", id).maybeSingle(),
+    supabase.from("lessons").select("id,title").eq("course_id", id),
+    supabase
+      .from("quizzes")
+      .select("id,title,status,lesson_id,created_at")
+      .eq("course_id", id)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+    supabase
+      .from("quizzes")
+      .select("*", { count: "exact", head: true })
+      .eq("course_id", id),
+  ]);
 
   if (courseError || !course) {
     return (
@@ -65,6 +87,12 @@ export default async function CursoQuizzesPage({ params }: Props) {
   }
 
   const lessonsMap = new Map((lessons || []).map((lesson) => [lesson.id, lesson.title]));
+  const totalItems = totalCount || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const buildHref = (targetPage: number) =>
+    buildListHref(`/admin/formacion/${id}/quizzes`, {
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
 
   return (
     <AdminPageShell>
@@ -140,6 +168,16 @@ export default async function CursoQuizzesPage({ params }: Props) {
             />
           </div>
         )}
+
+        <div className="px-5 pb-5">
+          <AdminPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            buildHref={buildHref}
+          />
+        </div>
       </AdminPanelCard>
     </AdminPageShell>
   );

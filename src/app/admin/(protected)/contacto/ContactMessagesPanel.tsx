@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
+  AdminPagination,
   AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import { buildListHref } from "@/lib/admin-query";
 import { deleteContactMessage, sendContactReply, updateContactMessage } from "./actions";
 
 type MessageStatus = "pending" | "read" | "responded" | "archived";
@@ -51,7 +53,14 @@ type ContactMessageRow = {
 };
 
 type Props = {
-  initialMessages: ContactMessageRow[];
+  messages: ContactMessageRow[];
+  query: string;
+  statusFilter: "all" | MessageStatus;
+  categoryFilter: "all" | MessageCategory;
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
 };
 
 const statusConfig: Record<MessageStatus, { label: string; className: string; dot: string }> = {
@@ -130,28 +139,34 @@ function buildWhatsAppHref(message: ContactMessageRow) {
     : null;
 }
 
-export default function ContactMessagesPanel({ initialMessages }: Props) {
+export default function ContactMessagesPanel({
+  messages,
+  query,
+  statusFilter,
+  categoryFilter,
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+}: Props) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | MessageStatus>("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | MessageCategory>("all");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
-    initialMessages[0]?.id || null
+    messages[0]?.id || null
   );
   const [noteDraft, setNoteDraft] = useState<{
     messageId: string | null;
     value: string;
   }>({
-    messageId: initialMessages[0]?.id || null,
-    value: initialMessages[0]?.admin_response || "",
+    messageId: messages[0]?.id || null,
+    value: messages[0]?.admin_response || "",
   });
   const [replyDraft, setReplyDraft] = useState<{
     messageId: string | null;
     subject: string;
     body: string;
   }>({
-    messageId: initialMessages[0]?.id || null,
-    subject: initialMessages[0] ? `Re: ${initialMessages[0].subject}` : "",
+    messageId: messages[0]?.id || null,
+    subject: messages[0] ? `Re: ${messages[0].subject}` : "",
     body: "",
   });
   const [feedback, setFeedback] = useState<{
@@ -162,39 +177,21 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
 
-  const normalizedQuery = query.trim().toLowerCase();
-
-  const filteredMessages = useMemo(() => {
-    return initialMessages.filter((message) => {
-      const matchesQuery = normalizedQuery
-        ? [
-            message.full_name,
-            message.email,
-            message.phone,
-            message.subject,
-            message.message,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(normalizedQuery)
-        : true;
-      const matchesStatus =
-        statusFilter === "all" ? true : message.status === statusFilter;
-      const matchesCategory =
-        categoryFilter === "all" ? true : message.category === categoryFilter;
-
-      return matchesQuery && matchesStatus && matchesCategory;
-    });
-  }, [initialMessages, normalizedQuery, statusFilter, categoryFilter]);
-
   const activeSelectedMessageId =
-    filteredMessages.find((message) => message.id === selectedMessageId)?.id ||
-    filteredMessages[0]?.id ||
+    messages.find((message) => message.id === selectedMessageId)?.id ||
+    messages[0]?.id ||
     null;
 
   const selectedMessage =
-    filteredMessages.find((message) => message.id === activeSelectedMessageId) ||
-    null;
+    messages.find((message) => message.id === activeSelectedMessageId) || null;
+
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/contacto", {
+      q: query || undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      category: categoryFilter !== "all" ? categoryFilter : undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
 
   const activeNoteDraft =
     noteDraft.messageId === selectedMessage?.id
@@ -219,7 +216,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
 
   const exportHref = useMemo(() => {
     const params = new URLSearchParams();
-    if (query.trim()) params.set("q", query.trim());
+    if (query) params.set("q", query);
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (categoryFilter !== "all") params.set("category", categoryFilter);
     const qs = params.toString();
@@ -355,15 +352,15 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
   return (
     <div className="space-y-6">
       <AdminPanelCard>
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.7fr_0.8fr_auto]">
+        <form className="grid gap-4 xl:grid-cols-[1.2fr_0.7fr_0.8fr_auto]" method="get">
           <label className="block">
             <span className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
               Buscar
             </span>
             <input
               type="text"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              name="q"
+              defaultValue={query}
               placeholder="Nombre, correo, teléfono, asunto o mensaje"
               className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
             />
@@ -374,10 +371,8 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               Estado
             </span>
             <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as "all" | MessageStatus)
-              }
+              name="status"
+              defaultValue={statusFilter}
               className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm"
             >
               <option value="all">Todos</option>
@@ -393,10 +388,8 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               Categoría
             </span>
             <select
-              value={categoryFilter}
-              onChange={(event) =>
-                setCategoryFilter(event.target.value as "all" | MessageCategory)
-              }
+              name="category"
+              defaultValue={categoryFilter}
               className="w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 py-3 text-sm"
             >
               <option value="all">Todas</option>
@@ -409,13 +402,22 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
           </label>
 
           <div className="flex items-end">
-            <a
-              href={exportHref}
+            <button
+              type="submit"
               className="flex w-full items-center justify-center rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--ivbcc-navy-2)]"
             >
-              Exportar CSV
-            </a>
+              Buscar
+            </button>
           </div>
+        </form>
+
+        <div className="mt-4 flex justify-end">
+          <a
+            href={exportHref}
+            className="rounded-full border border-[var(--ivbcc-navy)] px-4 py-2 text-sm font-extrabold text-[var(--ivbcc-navy)] transition hover:bg-[var(--ivbcc-navy)] hover:text-white"
+          >
+            Exportar CSV
+          </a>
         </div>
       </AdminPanelCard>
 
@@ -426,7 +428,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
           <div className="border-b border-[var(--ivbcc-line)] p-5">
             <h2 className="section-title text-xl text-[var(--ivbcc-ink)]">Mensajes</h2>
             <p className="muted-copy mt-1 text-sm">
-              {filteredMessages.length} mensaje(s) según los filtros actuales.
+              {totalItems} mensaje(s) según los filtros actuales.
             </p>
           </div>
 
@@ -443,7 +445,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ivbcc-line)] bg-white/70">
-                {filteredMessages.map((message) => {
+                {messages.map((message) => {
                   const status = getStatusConfig(message.status);
                   const isSelected = message.id === activeSelectedMessageId;
 
@@ -510,7 +512,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
             </table>
           </div>
 
-          {filteredMessages.length === 0 && (
+          {messages.length === 0 && (
             <div className="p-6">
               <AdminEmptyState
                 title="No hay mensajes para mostrar"
@@ -519,6 +521,16 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
               />
             </div>
           )}
+
+          <div className="px-5 pb-5">
+            <AdminPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              buildHref={buildHref}
+            />
+          </div>
         </AdminPanelCard>
 
         <AdminPanelCard>

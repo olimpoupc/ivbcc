@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
+  AdminPagination,
   AdminPanelCard,
   AdminSection,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import { buildListHref } from "@/lib/admin-query";
 import { validateImageFile } from "@/lib/security";
 import {
   deleteDonationMethod,
@@ -151,10 +153,25 @@ function toFormState(method: DonationMethodRow): DonationMethodFormState {
 
 export default function DonationMethodsPanel({
   initialMethods,
+  query,
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
 }: {
   initialMethods: DonationMethodRow[];
+  query: string;
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
 }) {
   const router = useRouter();
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/donaciones", {
+      q: query || undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [previousQrImageUrl, setPreviousQrImageUrl] = useState<string | null>(null);
   const [form, setForm] = useState<DonationMethodFormState>(emptyForm);
@@ -540,6 +557,27 @@ export default function DonationMethodsPanel({
       >
         <AdminPanelCard>
 
+        <form className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end" method="get">
+          <div className="flex-1">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
+              Buscar por título
+            </label>
+            <input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Ej: Nequi, Bancolombia..."
+              className="h-11 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+            />
+          </div>
+          <button
+            type="submit"
+            className="h-11 rounded-full bg-[var(--ivbcc-navy)] px-5 text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
+          >
+            Buscar
+          </button>
+        </form>
+
         <div className="space-y-4">
           {initialMethods.map((method) => (
             <div
@@ -602,11 +640,29 @@ export default function DonationMethodsPanel({
 
         {initialMethods.length === 0 ? (
           <AdminEmptyState
-            title="Aún no hay métodos configurados"
-            description="Crea el primer método para activar la página pública de donaciones."
+            title={
+              query
+                ? "No se encontraron métodos"
+                : "Aún no hay métodos configurados"
+            }
+            description={
+              query
+                ? "Ajusta la búsqueda para ver otros métodos."
+                : "Crea el primer método para activar la página pública de donaciones."
+            }
             icon="donation"
           />
         ) : null}
+
+        <div className="mt-4">
+          <AdminPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            buildHref={buildHref}
+          />
+        </div>
         </AdminPanelCard>
       </AdminSection>
     </section>

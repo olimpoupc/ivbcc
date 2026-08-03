@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import AuthFeedback from "@/components/AuthFeedback";
 import {
   AdminEmptyState,
+  AdminPagination,
   AdminPanelCard,
   AdminSection,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import { buildListHref } from "@/lib/admin-query";
 import {
   createHelpCenterItem,
   deleteHelpCenterItem,
@@ -47,6 +49,11 @@ type Feedback = {
 
 type Props = {
   initialItems: HelpCenterItemRow[];
+  query: string;
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
 };
 
 const categoryOptions: Array<{ value: HelpCenterCategory; label: string }> = [
@@ -99,9 +106,21 @@ function sortItems(items: HelpCenterItemRow[]) {
   });
 }
 
-export default function HelpCenterItemsPanel({ initialItems }: Props) {
+export default function HelpCenterItemsPanel({
+  initialItems,
+  query,
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+}: Props) {
   const router = useRouter();
   const sortedItems = useMemo(() => sortItems(initialItems), [initialItems]);
+  const buildHref = (targetPage: number) =>
+    buildListHref("/admin/centro-ayuda", {
+      q: query || undefined,
+      page: targetPage > 1 ? String(targetPage) : undefined,
+    });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [feedback, setFeedback] = useState<Feedback>({
@@ -365,6 +384,27 @@ export default function HelpCenterItemsPanel({ initialItems }: Props) {
       >
         <AdminPanelCard>
 
+        <form className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end" method="get">
+          <div className="flex-1">
+            <label className="mb-2 block text-sm font-extrabold text-[var(--ivbcc-ink)]">
+              Buscar por título
+            </label>
+            <input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Ej: Horarios, Ubicación..."
+              className="h-11 w-full rounded-2xl border border-[var(--ivbcc-line)] bg-white px-4 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+            />
+          </div>
+          <button
+            type="submit"
+            className="h-11 rounded-full bg-[var(--ivbcc-navy)] px-5 text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
+          >
+            Buscar
+          </button>
+        </form>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-[var(--ivbcc-line)] text-sm">
             <thead className="bg-[var(--ivbcc-paper)]">
@@ -440,11 +480,25 @@ export default function HelpCenterItemsPanel({ initialItems }: Props) {
 
         {sortedItems.length === 0 && (
           <AdminEmptyState
-            title="Aún no hay contenido"
-            description="Crea el primer elemento para alimentar el Centro de Ayuda."
+            title={query ? "No se encontró contenido" : "Aún no hay contenido"}
+            description={
+              query
+                ? "Ajusta la búsqueda para ver otros elementos."
+                : "Crea el primer elemento para alimentar el Centro de Ayuda."
+            }
             icon="spark"
           />
         )}
+
+        <div className="mt-4">
+          <AdminPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            buildHref={buildHref}
+          />
+        </div>
         </AdminPanelCard>
       </AdminSection>
     </section>
