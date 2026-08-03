@@ -8,7 +8,7 @@ import {
   AdminPanelCard,
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
-import { deleteContactMessage, updateContactMessage } from "./actions";
+import { deleteContactMessage, sendContactReply, updateContactMessage } from "./actions";
 
 type MessageStatus = "pending" | "read" | "responded" | "archived";
 type MessageCategory =
@@ -19,6 +19,16 @@ type MessageCategory =
   | "prayer"
   | "support"
   | "other";
+
+type ContactReplyRow = {
+  id: string;
+  subject: string;
+  body: string;
+  status: "sent" | "failed";
+  sent_by_email: string | null;
+  error_message: string | null;
+  created_at_label: string;
+};
 
 type ContactMessageRow = {
   id: string;
@@ -37,6 +47,7 @@ type ContactMessageRow = {
   created_at_label: string;
   responded_at_label: string;
   updated_at_label: string;
+  replies: ContactReplyRow[];
 };
 
 type Props = {
@@ -134,12 +145,22 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     messageId: initialMessages[0]?.id || null,
     value: initialMessages[0]?.admin_response || "",
   });
+  const [replyDraft, setReplyDraft] = useState<{
+    messageId: string | null;
+    subject: string;
+    body: string;
+  }>({
+    messageId: initialMessages[0]?.id || null,
+    subject: initialMessages[0] ? `Re: ${initialMessages[0].subject}` : "",
+    body: "",
+  });
   const [feedback, setFeedback] = useState<{
     type: "success" | "error" | "info";
     message: string;
   }>({ type: "info", message: "" });
   const [copyFeedback, setCopyFeedback] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -179,6 +200,16 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
     noteDraft.messageId === selectedMessage?.id
       ? noteDraft.value
       : selectedMessage?.admin_response || "";
+
+  const activeReplySubject =
+    replyDraft.messageId === selectedMessage?.id
+      ? replyDraft.subject
+      : selectedMessage
+        ? `Re: ${selectedMessage.subject}`
+        : "";
+
+  const activeReplyBody =
+    replyDraft.messageId === selectedMessage?.id ? replyDraft.body : "";
 
   const selectedStatus = selectedMessage
     ? getStatusConfig(selectedMessage.status)
@@ -245,6 +276,41 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
       type: "success",
       message: "Nota interna guardada. No se envió ningún correo.",
     });
+  }
+
+  async function handleSendReply() {
+    if (!selectedMessage) return;
+
+    const subject = activeReplySubject.trim();
+    const body = activeReplyBody.trim();
+
+    if (!subject || !body) {
+      setFeedback({
+        type: "error",
+        message: "Escribe un asunto y un mensaje antes de enviar el correo.",
+      });
+      return;
+    }
+
+    setIsSendingReply(true);
+    setFeedback({ type: "info", message: "Enviando correo..." });
+
+    const result = await sendContactReply(selectedMessage.id, { subject, body });
+
+    setIsSendingReply(false);
+
+    if (!result.success) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    setReplyDraft({
+      messageId: selectedMessage.id,
+      subject: `Re: ${selectedMessage.subject}`,
+      body: "",
+    });
+    router.refresh();
+    setFeedback({ type: "success", message: "Correo enviado correctamente." });
   }
 
   async function handleDelete() {
@@ -393,6 +459,11 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                           messageId: message.id,
                           value: message.admin_response,
                         });
+                        setReplyDraft({
+                          messageId: message.id,
+                          subject: `Re: ${message.subject}`,
+                          body: "",
+                        });
                       }}
                     >
                       <td className="px-5 py-4">
@@ -496,6 +567,99 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-[var(--ivbcc-line)] bg-white p-4">
+                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
+                  Enviar respuesta por correo
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--ivbcc-muted)]">
+                  Este correo se envía de verdad a {selectedMessage.email} y queda
+                  registrado en el historial de abajo.
+                </p>
+
+                <label className="mt-4 block">
+                  <span className="mb-1 block text-xs font-extrabold uppercase tracking-wide text-[var(--ivbcc-muted)]">
+                    Asunto
+                  </span>
+                  <input
+                    type="text"
+                    value={activeReplySubject}
+                    onChange={(event) =>
+                      setReplyDraft({
+                        messageId: selectedMessage.id,
+                        subject: event.target.value,
+                        body: activeReplyBody,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-[var(--ivbcc-line)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+                  />
+                </label>
+
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-xs font-extrabold uppercase tracking-wide text-[var(--ivbcc-muted)]">
+                    Mensaje
+                  </span>
+                  <textarea
+                    value={activeReplyBody}
+                    onChange={(event) =>
+                      setReplyDraft({
+                        messageId: selectedMessage.id,
+                        subject: activeReplySubject,
+                        body: event.target.value,
+                      })
+                    }
+                    rows={6}
+                    placeholder={`Hola ${selectedMessage.full_name}, bendiciones...`}
+                    className="w-full rounded-2xl border border-[var(--ivbcc-line)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ivbcc-gold)] focus:ring-2 focus:ring-[rgba(201,162,74,0.22)]"
+                  />
+                </label>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSendReply}
+                    disabled={isSendingReply}
+                    className="rounded-full bg-[var(--ivbcc-navy)] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)] disabled:opacity-60"
+                  >
+                    {isSendingReply ? "Enviando..." : "Enviar correo"}
+                  </button>
+                </div>
+
+                {selectedMessage.replies.length > 0 ? (
+                  <div className="mt-6 border-t border-[var(--ivbcc-line)] pt-4">
+                    <p className="kicker">Historial de respuestas enviadas</p>
+                    <ul className="mt-3 space-y-3">
+                      {selectedMessage.replies.map((reply) => (
+                        <li
+                          key={reply.id}
+                          className="rounded-2xl border border-[var(--ivbcc-line)] bg-[var(--ivbcc-paper)] p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">
+                              {reply.subject}
+                            </p>
+                            <AdminStatusBadge tone={reply.status === "sent" ? "green" : "red"}>
+                              {reply.status === "sent" ? "Enviado" : "Falló"}
+                            </AdminStatusBadge>
+                          </div>
+                          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-700">
+                            {reply.body}
+                          </p>
+                          <p className="mt-2 text-xs text-gray-500">
+                            {reply.created_at_label}
+                            {reply.sent_by_email ? ` · ${reply.sent_by_email}` : ""}
+                          </p>
+                          {reply.error_message ? (
+                            <p className="mt-1 text-xs font-semibold text-red-600">
+                              {reply.error_message}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+
               <div className="rounded-2xl border border-[rgba(201,162,74,0.28)] bg-[rgba(201,162,74,0.1)] p-4">
                 <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">Acciones rápidas</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--ivbcc-muted)]">
@@ -508,7 +672,7 @@ export default function ContactMessagesPanel({ initialMessages }: Props) {
                     href={mailtoHref}
                     className="rounded-full bg-[var(--ivbcc-navy)] px-4 py-3 text-center text-sm font-extrabold text-white transition hover:bg-[var(--ivbcc-navy-2)]"
                   >
-                    Responder por correo
+                    Abrir en mi correo (manual)
                   </a>
                   {whatsappHref ? (
                     <a

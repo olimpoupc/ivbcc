@@ -19,16 +19,22 @@ function formatDateColombia(value?: string | null) {
   }).format(new Date(value));
 }
 
+const replySelect =
+  "id,contact_message_id,subject,body,status,sent_by_email,error_message,created_at";
+
 export default async function AdminContactoPage() {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: messages, error }] =
-    await Promise.all([
-      supabase
-        .from("contact_messages")
-        .select(contactMessageSelect)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [{ data: messages, error }, { data: replies }] = await Promise.all([
+    supabase
+      .from("contact_messages")
+      .select(contactMessageSelect)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("contact_message_replies")
+      .select(replySelect)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (error) {
     return (
@@ -41,6 +47,13 @@ export default async function AdminContactoPage() {
         />
       </AdminPageShell>
     );
+  }
+
+  const repliesByMessageId = new Map<string, typeof replies>();
+  for (const reply of replies || []) {
+    const list = repliesByMessageId.get(reply.contact_message_id) || [];
+    list.push(reply);
+    repliesByMessageId.set(reply.contact_message_id, list);
   }
 
   const rows = (messages || []).map((message) => ({
@@ -60,6 +73,15 @@ export default async function AdminContactoPage() {
     created_at_label: formatDateColombia(message.created_at),
     responded_at_label: formatDateColombia(message.responded_at),
     updated_at_label: formatDateColombia(message.updated_at),
+    replies: (repliesByMessageId.get(message.id) || []).map((reply) => ({
+      id: reply.id,
+      subject: reply.subject,
+      body: reply.body,
+      status: reply.status,
+      sent_by_email: reply.sent_by_email,
+      error_message: reply.error_message,
+      created_at_label: formatDateColombia(reply.created_at),
+    })),
   }));
 
   const pendingMessages = rows.filter((message) => message.status === "pending").length;
