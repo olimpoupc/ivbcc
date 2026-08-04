@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { deleteQuiz } from "./actions";
+import { deleteQuiz, getQuizDeletionImpact } from "./actions";
 
 type Props = {
   id: string;
@@ -10,11 +10,32 @@ type Props = {
 
 export default function DeleteQuizButton({ id, courseId }: Props) {
   const [isPending, startTransition] = useTransition();
+  const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState("");
 
-  function handleDelete() {
-    const confirmDelete = confirm("¿Seguro que deseas eliminar este quiz?");
+  async function handleDelete() {
+    setError("");
+    setIsChecking(true);
+    const impact = await getQuizDeletionImpact(id);
+    setIsChecking(false);
 
+    if (!impact.success) {
+      setError(impact.error);
+      return;
+    }
+
+    const warningLines = ["¿Seguro que deseas eliminar este quiz?", ""];
+
+    if (impact.attempts > 0) {
+      warningLines.push(
+        `También se eliminará permanentemente el historial de ${impact.attempts} intento(s) que ya respondieron los estudiantes. Si alguien ya lo había aprobado, esa lección volverá a bloquearse.`,
+        ""
+      );
+    }
+
+    warningLines.push("Esta acción no se puede deshacer.");
+
+    const confirmDelete = confirm(warningLines.join("\n"));
     if (!confirmDelete) return;
 
     setError("");
@@ -29,10 +50,10 @@ export default function DeleteQuizButton({ id, courseId }: Props) {
       <button
         type="button"
         onClick={handleDelete}
-        disabled={isPending}
+        disabled={isPending || isChecking}
         className="rounded-full bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700 disabled:opacity-60"
       >
-        {isPending ? "Eliminando..." : "Eliminar"}
+        {isPending ? "Eliminando..." : isChecking ? "Verificando..." : "Eliminar"}
       </button>
       {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
     </div>

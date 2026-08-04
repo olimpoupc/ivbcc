@@ -46,14 +46,34 @@ export async function saveQuiz(input: SaveQuizInput): Promise<SaveQuizResult> {
   if (error) {
     return {
       success: false,
-      error: input.quizId
-        ? "No se pudo actualizar el quiz."
-        : "No se pudo crear el quiz.",
+      error:
+        error.message ||
+        (input.quizId
+          ? "No se pudo actualizar el quiz."
+          : "No se pudo crear el quiz."),
     };
   }
 
   revalidatePath(`/admin/formacion/${input.courseId}/quizzes`);
   return { success: true, quizId: data as string };
+}
+
+export type QuizDeletionImpactResult =
+  | { success: true; attempts: number }
+  | { success: false; error: string };
+
+export async function getQuizDeletionImpact(
+  quizId: string
+): Promise<QuizDeletionImpactResult> {
+  const { supabase, isAdmin } = await getAdminUser();
+  if (!isAdmin) return { success: false, error: "No autorizado." };
+
+  const { count: attempts } = await supabase
+    .from("quiz_attempts")
+    .select("*", { count: "exact", head: true })
+    .eq("quiz_id", quizId);
+
+  return { success: true, attempts: attempts || 0 };
 }
 
 export async function deleteQuiz(
