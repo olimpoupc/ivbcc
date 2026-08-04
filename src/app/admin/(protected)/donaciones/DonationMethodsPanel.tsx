@@ -112,6 +112,28 @@ function getMethodTypeLabel(value: string) {
   return methodTypeOptions.find((option) => option.value === value)?.label || "Otro";
 }
 
+// next.config.ts only whitelists the Supabase storage host for next/image;
+// a QR URL pointing anywhere else renders fine here (plain <img>-less
+// preview aside) but breaks with a hard error on the public donations page.
+function getAllowedImageHost() {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "").hostname;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedImageUrl(url: string) {
+  const allowedHost = getAllowedImageHost();
+  if (!allowedHost) return true;
+
+  try {
+    return new URL(url).hostname === allowedHost;
+  } catch {
+    return false;
+  }
+}
+
 function getBankFieldLabel(methodType: DonationMethodType) {
   return methodType === "breb_key" ? "Entidad asociada" : "Banco";
 }
@@ -127,7 +149,7 @@ function getAccountNumberLabel(methodType: DonationMethodType) {
     methodType === "wompi" ||
     methodType === "mercadopago"
   ) {
-    return "URL de pago";
+    return "Usuario o referencia (opcional)";
   }
 
   return "Número de cuenta o referencia";
@@ -274,6 +296,20 @@ export default function DonationMethodsPanel({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (
+      !qrFile &&
+      form.qr_image_url.trim() &&
+      !isAllowedImageUrl(form.qr_image_url.trim())
+    ) {
+      setFeedback({
+        type: "error",
+        message:
+          "Esa URL de QR no se podrá mostrar en el sitio: sube el archivo con \"Subir QR\" en vez de pegar un enlace externo.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setFeedback({ type: "info", message: "Guardando método..." });
 
@@ -428,7 +464,11 @@ export default function DonationMethodsPanel({
             help={
               form.method_type === "breb_key"
                 ? "La llave puede ser celular, documento, correo o código alfanumérico registrado en Bre-B."
-                : undefined
+                : form.method_type === "paypal" ||
+                    form.method_type === "wompi" ||
+                    form.method_type === "mercadopago"
+                  ? "Dato adicional para mostrar en pantalla. El enlace al que se dirige al donante se configura abajo, en \"URL de pago\"."
+                  : undefined
             }
           >
             <input
@@ -470,7 +510,16 @@ export default function DonationMethodsPanel({
               className={inputClassName}
             />
           </Field>
-          <Field label="URL de QR">
+          <Field
+            label="URL de QR"
+            help={
+              !qrFile &&
+              form.qr_image_url.trim() &&
+              !isAllowedImageUrl(form.qr_image_url.trim())
+                ? "⚠ Este enlace es de otro sitio y no se podrá mostrar. Usa \"Subir QR\" abajo en su lugar."
+                : "Solo para imágenes ya alojadas en el almacenamiento de IVBCC. Para una imagen nueva, usa \"Subir QR\"."
+            }
+          >
             <input
               type="url"
               value={form.qr_image_url}

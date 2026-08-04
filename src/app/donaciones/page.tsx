@@ -45,6 +45,14 @@ function isBrebMethod(method: DonationMethod) {
   return method.method_type === "breb_key";
 }
 
+function isPaymentLinkMethod(method: DonationMethod) {
+  return (
+    method.method_type === "paypal" ||
+    method.method_type === "wompi" ||
+    method.method_type === "mercadopago"
+  );
+}
+
 function getAccountNumberLabel(methodType: string) {
   if (methodType === "nequi" || methodType === "daviplata") return "Número celular";
   if (methodType === "bancolombia" || methodType === "davivienda") {
@@ -56,10 +64,19 @@ function getAccountNumberLabel(methodType: string) {
     methodType === "wompi" ||
     methodType === "mercadopago"
   ) {
-    return "URL de pago";
+    return "Referencia de pago";
   }
 
   return "Referencia";
+}
+
+// Only the last 4 characters stay visible — the full account_holder ID
+// number doesn't need to be public just because some banks ask donors to
+// enter it when transferring.
+function maskDocumentNumber(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length <= 4) return "*".repeat(trimmed.length);
+  return `${"*".repeat(trimmed.length - 4)}${trimmed.slice(-4)}`;
 }
 
 function detailRows(method: DonationMethod) {
@@ -75,7 +92,12 @@ function detailRows(method: DonationMethod) {
       label: getAccountNumberLabel(method.method_type),
       value: isBreb ? null : method.account_number,
     },
-    { label: "Documento", value: method.document_number },
+    {
+      label: "Documento",
+      value: method.document_number
+        ? maskDocumentNumber(method.document_number)
+        : null,
+    },
     { label: "Teléfono", value: method.phone },
   ].filter((item) => item.value);
 }
@@ -218,10 +240,18 @@ export default async function DonacionesPage() {
                         title={method.title}
                         accountNumber={method.account_number}
                         accountCopyButtonText={
-                          isBrebMethod(method) ? "Copiar llave" : undefined
+                          isBrebMethod(method)
+                            ? "Copiar llave"
+                            : isPaymentLinkMethod(method)
+                              ? "Copiar referencia"
+                              : undefined
                         }
                         accountCopyLabel={
-                          isBrebMethod(method) ? "Llave" : undefined
+                          isBrebMethod(method)
+                            ? "Llave"
+                            : isPaymentLinkMethod(method)
+                              ? "Referencia"
+                              : undefined
                         }
                         phone={method.phone}
                         paymentUrl={method.payment_url}
