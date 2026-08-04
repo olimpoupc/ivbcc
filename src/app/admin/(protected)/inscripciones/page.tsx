@@ -13,6 +13,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 
@@ -89,11 +90,12 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
     .select("*", { count: "exact", head: true });
 
   if (query) {
-    const eventsOrFilter = `full_name.ilike.%${query}%,email.ilike.%${query}%,event_title.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const eventsOrFilter = `full_name.ilike.${likeValue},email.ilike.${likeValue},event_title.ilike.${likeValue}`;
     eventsDataQuery = eventsDataQuery.or(eventsOrFilter);
     eventsFilteredCountQuery = eventsFilteredCountQuery.or(eventsOrFilter);
 
-    const coursesOrFilter = `student_name.ilike.%${query}%,course_title.ilike.%${query}%`;
+    const coursesOrFilter = `student_name.ilike.${likeValue},course_title.ilike.${likeValue}`;
     coursesDataQuery = coursesDataQuery.or(coursesOrFilter);
     coursesFilteredCountQuery = coursesFilteredCountQuery.or(coursesOrFilter);
   }

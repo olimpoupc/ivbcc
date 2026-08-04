@@ -4,6 +4,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
 } from "./admin-query";
 
 describe("getParam", () => {
@@ -69,5 +70,27 @@ describe("buildListHref", () => {
     });
 
     expect(href).toBe("/admin/eventos?q=retiro&status=draft");
+  });
+});
+
+describe("quoteFilterValue", () => {
+  it("wraps a plain value in double quotes", () => {
+    expect(quoteFilterValue("%hola%")).toBe('"%hola%"');
+  });
+
+  it("keeps commas and periods literal instead of letting them act as filter separators", () => {
+    // Without quoting, this would be parsed by PostgREST as two extra
+    // conditions (",status.eq.published") instead of one literal value.
+    expect(quoteFilterValue("%x,status.eq.published%")).toBe(
+      '"%x,status.eq.published%"'
+    );
+  });
+
+  it("escapes embedded double quotes so they can't close the value early", () => {
+    expect(quoteFilterValue('%a"b%')).toBe('"%a\\"b%"');
+  });
+
+  it("escapes backslashes before quoting so escaping itself can't be spoofed", () => {
+    expect(quoteFilterValue("%a\\b%")).toBe('"%a\\\\b%"');
   });
 });

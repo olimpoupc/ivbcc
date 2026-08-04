@@ -32,3 +32,15 @@ export function getPageRange(page: number, pageSize: number) {
   const to = from + pageSize - 1;
   return { from, to };
 }
+
+// PostgREST's .or()/.ilike() filter strings use "," to separate conditions
+// and "." to separate column/operator/value, so interpolating raw user input
+// into one (e.g. `title.ilike.%${query}%`) lets a search containing those
+// characters split into unintended extra conditions. Wrapping the value in
+// double quotes makes PostgREST treat everything inside it literally; `\`
+// and `"` inside the value must themselves be escaped so the closing quote
+// isn't spoofed early.
+export function quoteFilterValue(value: string) {
+  const escaped = value.split("\\").join("\\\\").split('"').join('\\"');
+  return `"${escaped}"`;
+}

@@ -17,6 +17,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import DeleteNewsButton from "./DeleteNewsButton";
@@ -95,7 +96,8 @@ export default async function AdminNoticiasPage({ searchParams }: Props) {
   }
 
   if (query) {
-    const orFilter = `title.ilike.%${query}%,slug.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const orFilter = `title.ilike.${likeValue},slug.ilike.${likeValue}`;
     dataQuery = dataQuery.or(orFilter);
     filteredCountQuery = filteredCountQuery.or(orFilter);
   }

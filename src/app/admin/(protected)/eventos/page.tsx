@@ -17,6 +17,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import DeleteEventButton from "./DeleteEventButton";
@@ -93,7 +94,8 @@ export default async function AdminEventosPage({ searchParams }: Props) {
   }
 
   if (query) {
-    const orFilter = `title.ilike.%${query}%,location.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const orFilter = `title.ilike.${likeValue},location.ilike.${likeValue}`;
     dataQuery = dataQuery.or(orFilter);
     filteredCountQuery = filteredCountQuery.or(orFilter);
   }

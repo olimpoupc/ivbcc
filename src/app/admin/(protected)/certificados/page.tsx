@@ -21,6 +21,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import RevokeCertificateButton from "./RevokeCertificateButton";
@@ -99,7 +100,8 @@ export default async function AdminCertificadosPage({ searchParams }: Props) {
   }
 
   if (query) {
-    const orFilter = `student_name.ilike.%${query}%,course_title.ilike.%${query}%,code.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const orFilter = `student_name.ilike.${likeValue},course_title.ilike.${likeValue},code.ilike.${likeValue}`;
     certificatesDataQuery = certificatesDataQuery.or(orFilter);
     certificatesFilteredCountQuery = certificatesFilteredCountQuery.or(orFilter);
   }

@@ -8,6 +8,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import ContactMessagesPanel from "./ContactMessagesPanel";
@@ -82,7 +83,8 @@ export default async function AdminContactoPage({ searchParams }: Props) {
   }
 
   if (query) {
-    const orFilter = `full_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%,subject.ilike.%${query}%,message.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const orFilter = `full_name.ilike.${likeValue},email.ilike.${likeValue},phone.ilike.${likeValue},subject.ilike.${likeValue},message.ilike.${likeValue}`;
     dataQuery = dataQuery.or(orFilter);
     filteredCountQuery = filteredCountQuery.or(orFilter);
   }

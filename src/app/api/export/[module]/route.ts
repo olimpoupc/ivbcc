@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
+import { quoteFilterValue } from "@/lib/admin-query";
 import { buildCsvResponse } from "@/lib/csv";
 
 const EXPORT_ROW_LIMIT = 20000;
@@ -79,8 +80,9 @@ export async function GET(
     if (status !== "all") dataQuery = dataQuery.eq("status", status);
     if (category !== "all") dataQuery = dataQuery.eq("category", category);
     if (query) {
+      const likeValue = quoteFilterValue(`%${query}%`);
       dataQuery = dataQuery.or(
-        `full_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%,subject.ilike.%${query}%,message.ilike.%${query}%`
+        `full_name.ilike.${likeValue},email.ilike.${likeValue},phone.ilike.${likeValue},subject.ilike.${likeValue},message.ilike.${likeValue}`
       );
     }
 
@@ -112,8 +114,9 @@ export async function GET(
       .limit(EXPORT_ROW_LIMIT);
 
     if (query) {
+      const likeValue = quoteFilterValue(`%${query}%`);
       dataQuery = dataQuery.or(
-        `full_name.ilike.%${query}%,email.ilike.%${query}%,event_title.ilike.%${query}%`
+        `full_name.ilike.${likeValue},email.ilike.${likeValue},event_title.ilike.${likeValue}`
       );
     }
 
@@ -143,8 +146,9 @@ export async function GET(
       .limit(EXPORT_ROW_LIMIT);
 
     if (query) {
+      const likeValue = quoteFilterValue(`%${query}%`);
       dataQuery = dataQuery.or(
-        `student_name.ilike.%${query}%,course_title.ilike.%${query}%`
+        `student_name.ilike.${likeValue},course_title.ilike.${likeValue}`
       );
     }
 

@@ -13,6 +13,7 @@ import {
   getPageParam,
   getPageRange,
   getParam,
+  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import DownloadRegistrationsCsvButton from "./DownloadRegistrationsCsvButton";
@@ -59,7 +60,8 @@ export default async function EventoInscritosPage({ params, searchParams }: Prop
     .eq("event_id", id);
 
   if (query) {
-    const orFilter = `full_name.ilike.%${query}%,email.ilike.%${query}%`;
+    const likeValue = quoteFilterValue(`%${query}%`);
+    const orFilter = `full_name.ilike.${likeValue},email.ilike.${likeValue}`;
     dataQuery = dataQuery.or(orFilter);
     filteredCountQuery = filteredCountQuery.or(orFilter);
   }
