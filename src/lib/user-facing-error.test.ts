@@ -29,6 +29,17 @@ describe("getUserFacingErrorMessage", () => {
     );
   });
 
+  it("recognizes the quiz attempt rate-limit trigger message", () => {
+    const error = {
+      message: "Demasiados intentos en este quiz. Espera unos minutos e intenta de nuevo.",
+      code: "P0001",
+    };
+
+    expect(getUserFacingErrorMessage(error, "fallback")).toBe(
+      "Demasiados intentos en este quiz. Espera unos minutos e intenta de nuevo."
+    );
+  });
+
   it("falls back to the generic message for unrecognized errors (e.g. raw Postgres constraint errors)", () => {
     const error = {
       message:

@@ -36,6 +36,10 @@ const KNOWN_SAFE_PATTERNS: Array<{ match: RegExp; message: string }> = [
     match: /demasiados mensajes enviados desde este correo/i,
     message: "Demasiados mensajes enviados desde este correo. Intenta más tarde.",
   },
+  {
+    match: /demasiados intentos en este quiz/i,
+    message: "Demasiados intentos en este quiz. Espera unos minutos e intenta de nuevo.",
+  },
 ];
 
 function extractMessage(error: unknown): string {

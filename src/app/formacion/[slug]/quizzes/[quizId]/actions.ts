@@ -5,6 +5,7 @@ import {
   createSupabaseServiceRoleClient,
 } from "@/lib/supabase-server";
 import { getQuizPercentage, isQuizAttemptApproved } from "@/lib/course-progress";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 export type SubmitQuizAttemptResult =
   | {
@@ -100,7 +101,11 @@ export async function submitQuizAttempt(
   });
 
   if (insertError) {
-    return { success: false, error: "No pudimos guardar tu intento." };
+    console.error(insertError);
+    return {
+      success: false,
+      error: getUserFacingErrorMessage(insertError, "No pudimos guardar tu intento."),
+    };
   }
 
   return {
