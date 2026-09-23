@@ -29,3 +29,43 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+  # Optional and non-blocking: the RLS integration tests need Docker plus the
+  # Supabase local stack, so they live in their own job (`npm test` and the
+  # `check` job above never touch Docker). They use the public demo keys of the
+  # local stack (see src/lib/rls-integration/helpers.ts); no secrets involved.
+  rls:
+    name: rls (Supabase local)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Start Supabase local stack
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
+
+      # `supabase start` may not apply every migration; the RLS tests need all of them.
+      - name: Apply all migrations
+        run: |
+          supabase migration up --local
+          supabase migration list --local
+
+      - run: npm run test:rls
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          supabase status || true
+          docker ps -a || true
