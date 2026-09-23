@@ -717,3 +717,114 @@ describe("5. Usuario NO autenticado (anon) escribiendo en tablas protegidas por 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+describe("6. Verificacion publica de certificados: solo por codigo exacto (verify_certificate)", () => {
+  // los codigos reales son SIEMPRE en mayusculas (buildCertificateCode) y la busqueda normaliza a mayusculas
+  const code = () => `RLS-CERT-${runId.toUpperCase()}`;
+
+  beforeAll(async () => {
+    must(
+      await service.from("course_certificates").insert({
+        code: code(),
+        user_id: userB.id,
+        course_id: course.id,
+        student_name: "Estudiante RLS",
+        course_title: "Curso RLS",
+        status: "valid",
+      }),
+      "sembrar certificado de B",
+    );
+    cleanup.push(async () => service.from("course_certificates").delete().eq("code", code()));
+  }, 60_000);
+
+  it("CONTROL: un visitante anonimo SI verifica un certificado con su codigo exacto (solo campos publicos)", async () => {
+    const res = await anon.rpc("verify_certificate", { p_code: code() });
+
+    expect(res.error).toBeNull();
+    expect(res.data).toHaveLength(1);
+    expect(res.data?.[0]).toMatchObject({
+      code: code(),
+      student_name: "Estudiante RLS",
+      course_title: "Curso RLS",
+      status: "valid",
+    });
+    // nunca expone quien es el usuario ni el curso interno
+    expect(Object.keys(res.data?.[0] ?? {}).sort()).toEqual(
+      ["code", "course_title", "issued_at", "status", "student_name"],
+    );
+  });
+
+  it("CONTROL: la busqueda normaliza mayusculas y espacios", async () => {
+    const res = await anon.rpc("verify_certificate", { p_code: `  ${code().toLowerCase()}  ` });
+    expect(res.error).toBeNull();
+    expect(res.data).toHaveLength(1);
+  });
+
+  it("CONTROL: un usuario autenticado tambien puede verificar por codigo", async () => {
+    const res = await userA.client.rpc("verify_certificate", { p_code: code() });
+    expect(res.error).toBeNull();
+    expect(res.data).toHaveLength(1);
+  });
+
+  it("BLOQUEO: un codigo inexistente no devuelve nada", async () => {
+    const res = await anon.rpc("verify_certificate", { p_code: `NO-EXISTE-${runId}` });
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+  });
+
+  it("BLOQUEO: no se puede listar con comodines ni con codigo parcial o vacio", async () => {
+    for (const p_code of ["%", "_", "RLS-CERT-", "RLS-CERT-%", "", "   "]) {
+      const res = await anon.rpc("verify_certificate", { p_code });
+      expect(res.error, `p_code=${JSON.stringify(p_code)}`).toBeNull();
+      expect(res.data, `p_code=${JSON.stringify(p_code)}`).toEqual([]);
+    }
+  });
+
+  it("CONTROL: un certificado revocado se devuelve con su estado (la pagina dice 'revocado', no 'no encontrado')", async () => {
+    must(
+      await service.from("course_certificates").update({ status: "revoked" }).eq("code", code()),
+      "revocar",
+    );
+    const res = await anon.rpc("verify_certificate", { p_code: code() });
+    must(
+      await service.from("course_certificates").update({ status: "valid" }).eq("code", code()),
+      "restaurar",
+    );
+
+    expect(res.error).toBeNull();
+    expect(res.data?.[0]?.status).toBe("revoked");
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("7. quiz_attempts: rango de score (CHECK quiz_attempts_score_range_check)", () => {
+  // Con service_role para aislar el CHECK de RLS: vale igual antes y despues de
+  // retirar las politicas de INSERT de usuarios.
+  const attempt = (score: number, total_questions: number) => ({
+    quiz_id: quiz.id,
+    user_id: userB.id,
+    score,
+    total_questions,
+  });
+
+  it("BLOQUEO: score mayor que total_questions (999 de 1) se rechaza", async () => {
+    const res = await service.from("quiz_attempts").insert(attempt(999, 1));
+    expect(res.error?.code).toBe("23514");
+    expect(res.error?.message).toContain("quiz_attempts_score_range_check");
+  });
+
+  it("BLOQUEO: score negativo se rechaza", async () => {
+    const res = await service.from("quiz_attempts").insert(attempt(-1, 5));
+    expect(res.error?.code).toBe("23514");
+  });
+
+  it("CONTROL: score igual al total y score 0 SI se aceptan", async () => {
+    const perfect = await service.from("quiz_attempts").insert(attempt(5, 5)).select("score,total_questions");
+    expect(perfect.error).toBeNull();
+    expect(perfect.data).toEqual([{ score: 5, total_questions: 5 }]);
+
+    const zero = await service.from("quiz_attempts").insert(attempt(0, 5)).select("score");
+    expect(zero.error).toBeNull();
+  });
+});
