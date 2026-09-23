@@ -26,6 +26,23 @@ export async function createSupabaseServerClient() {
   });
 }
 
+// Anonymous client with NO cookies()/session. Use it for public reads (the root
+// layout's site settings, home, /eventos, /noticias). Reading cookies() is a
+// Next.js dynamic API: any route that touches it — including through the root
+// layout — is rendered on every request and its `revalidate` is ignored, so
+// nothing is ever cached (Vercel answers x-vercel-cache: MISS every time).
+// Because there is no session, RLS treats the caller as a plain visitor even
+// when an admin is signed in, so these pages never show drafts.
+export function createSupabasePublicClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 // Bypasses RLS entirely — only for narrow, deliberate server-only reads where
 // no authenticated-user policy can grant the right access (e.g. reading quiz
 // correct-answer data to grade an attempt, or public certificate lookups).

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 
 export const revalidate = 300;
 
@@ -18,7 +18,7 @@ function formatDateColombia(value?: string | null) {
 
 export default async function NoticiasPage() {
   const now = new Date().toISOString();
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
 
   const { data: noticias, error } = await supabase
     .from("news")

@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 
 export type PublicSiteSettings = {
   church_name: string;
@@ -42,7 +42,7 @@ export const defaultPublicSiteSettings: PublicSiteSettings = {
 
 export async function getPublicSiteSettings(): Promise<PublicSiteSettings> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicClient();
     const { data, error } = await supabase
       .from("site_settings")
       .select(

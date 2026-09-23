@@ -7,7 +7,7 @@ import HomeContentCarousel, {
   type HomeContentCarouselItem,
 } from "@/components/home/HomeContentCarousel";
 import YouTubeEmbed from "@/components/media/YouTubeEmbed";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 import { getPublicSiteSettings } from "@/lib/site-settings";
 
 export const revalidate = 300;
@@ -255,7 +255,7 @@ function buildHomeCarouselItems({
 }
 
 export default async function Home() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const now = new Date().toISOString();
   const siteSettings = await getPublicSiteSettings();
 

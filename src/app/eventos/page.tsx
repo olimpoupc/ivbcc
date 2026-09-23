@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import EmptyImagePlaceholder from "@/components/EmptyImagePlaceholder";
 import EventCountdown from "@/components/ui/EventCountdown";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 
 export const revalidate = 300;
 
@@ -33,7 +33,7 @@ function eventMonth(value?: string | null) {
 }
 
 export default async function EventosPage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const { data: eventos, error } = await supabase
     .from("events")
     .select("id,title,slug,description,image_url,event_date,location,registration_enabled,status")

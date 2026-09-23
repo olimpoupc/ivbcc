@@ -42,6 +42,12 @@ export async function generateMetadata({ params }: Props) {
   });
 }
 
+// Intentionally dynamic (server-rendered on every request): unlike home,
+// /eventos and /noticias this page is personalised per user — it reads the
+// session (auth.getUser()) to load the profile, enrollment, progress and
+// certificate state, which needs cookies(). Making it static would mean
+// splitting the public course data (cacheable) from the per-user parts (fetched
+// client-side, as CourseEnrollButton already does) — not done here.
 export default async function CursoDetallePage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
