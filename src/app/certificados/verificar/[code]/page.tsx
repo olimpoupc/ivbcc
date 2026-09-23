@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { createClient } from "@supabase/supabase-js";
 import CertificateView from "@/components/certificates/CertificateView";
 import {
   CERTIFICATE_INSTITUTION_NAME,
@@ -9,29 +8,13 @@ import {
   type CourseCertificateRecord,
 } from "@/lib/certificates";
 import { buildContentMetadata } from "@/lib/seo";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 
 type Props = {
   params: Promise<{
     code: string;
   }>;
 };
-
-async function createCertificateLookupClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (supabaseUrl && serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-  }
-
-  return createSupabaseServerClient();
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params;
@@ -48,13 +31,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VerificarCertificadoPage({ params }: Props) {
   const { code } = await params;
   const decodedCode = decodeURIComponent(code).trim().toUpperCase();
-  const supabase = await createCertificateLookupClient();
+  // Exact-code lookup through verify_certificate(): a SECURITY DEFINER function
+  // that returns only the public fields of a single certificate. There is no
+  // public SELECT on course_certificates, so this can not be used to list them.
+  const supabase = createSupabasePublicClient();
 
-  const { data: certificate, error } = await supabase
-    .from("course_certificates")
-    .select("id,code,user_id,course_id,student_name,course_title,issued_at,status")
-    .eq("code", decodedCode)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("verify_certificate", {
+    p_code: decodedCode,
+  });
+  const certificate = data?.[0] ?? null;
 
   const certificateStatus = getCertificatePublicStatus(
     error ? null : certificate

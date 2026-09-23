@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  createSupabaseServerClient,
+  createSupabaseServiceRoleClient,
+} from "@/lib/supabase-server";
 import { buildCourseProgressState } from "@/lib/course-progress";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
@@ -206,8 +209,16 @@ export async function getOrCreateCourseCertificate(
       email: user.email,
     });
 
+    // Written with the service-role client on purpose: signed-in users have no
+    // INSERT policy on course_certificates, otherwise anyone could call the
+    // Supabase API directly and issue themselves a valid certificate for any
+    // course. Eligibility (published course, enrollment, all lesson quizzes and
+    // the final quiz approved) was verified above, and user_id / student_name /
+    // course_title / status all come from server-side data.
+    const certificateWriter = createSupabaseServiceRoleClient();
+
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const { data: certificate, error: insertError } = await supabase
+      const { data: certificate, error: insertError } = await certificateWriter
         .from("course_certificates")
         .insert({
           code: buildCertificateCode(),

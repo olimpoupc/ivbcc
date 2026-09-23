@@ -93,7 +93,13 @@ export async function submitQuizAttempt(
   const total = questionIds.length;
   const attempt = { score, total_questions: total };
 
-  const { error: insertError } = await supabase.from("quiz_attempts").insert({
+  // Written with the service-role client on purpose: there is no INSERT policy
+  // on quiz_attempts for signed-in users, because otherwise anyone could call the
+  // Supabase API directly and insert an attempt with any score, skipping the
+  // grading above. Everything that makes this write legitimate has been checked
+  // by now (verified session, visible quiz, enrollment, server-side grading), and
+  // user_id comes from the verified session, never from the client.
+  const { error: insertError } = await createSupabaseServiceRoleClient().from("quiz_attempts").insert({
     quiz_id: quizId,
     user_id: user.id,
     score,
