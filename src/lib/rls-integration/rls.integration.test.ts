@@ -32,6 +32,7 @@ let quiz: { id: string };
 let questionId: string;
 let attemptA: { id: string; score: number };
 let eventId: string;
+let extraCourseId: string; // curso propio de la seccion 8 (course_certificates es UNIQUE user_id+course_id)
 
 const cleanup: Array<() => Promise<unknown>> = [];
 
@@ -148,6 +149,16 @@ beforeAll(async () => {
     "evento base",
   ).id;
   cleanup.push(async () => service.from("events").delete().eq("id", eventId));
+
+  extraCourseId = mustRow(
+    await service
+      .from("courses")
+      .insert({ title: `RLS curso extra ${runId}`, slug: `rls-${runId}-extra`, description: "d", status: "published" })
+      .select("id")
+      .single(),
+    "curso extra",
+  ).id;
+  cleanup.push(async () => service.from("courses").delete().eq("id", extraCourseId));
 }, 60_000);
 
 afterAll(async () => {
@@ -512,15 +523,30 @@ describe("4. quiz_attempts de OTRO usuario", () => {
     expect(res.data).toEqual([{ id: attemptA.id, score: attemptA.score }]);
   });
 
-  it("CONTROL: A SI puede insertar un intento propio", async () => {
+  it("BLOQUEO: A no puede insertarse un intento propio con nota perfecta (se saltaria la calificacion del servidor)", async () => {
+    const before = await rowCount("quiz_attempts");
+
     const res = await userA.client
       .from("quiz_attempts")
-      .insert({ quiz_id: quiz.id, user_id: userA.id, score: 1, total_questions: 5 })
-      .select("id, user_id");
+      .insert({ quiz_id: quiz.id, user_id: userA.id, score: 5, total_questions: 5 });
 
+    expectInsertDenied(res);
+    expect(await rowCount("quiz_attempts")).toBe(before);
+  });
+
+  it("CONTROL: el flujo real SI guarda el intento: la server action escribe con service_role y A lo lee", async () => {
+    const inserted = mustRow(
+      await service
+        .from("quiz_attempts")
+        .insert({ quiz_id: quiz.id, user_id: userA.id, score: 1, total_questions: 5 })
+        .select("id")
+        .single(),
+      "intento via service_role",
+    );
+
+    const res = await userA.client.from("quiz_attempts").select("id, user_id").eq("id", inserted.id);
     expect(res.error).toBeNull();
-    expect(res.data).toHaveLength(1);
-    expect(res.data?.[0].user_id).toBe(userA.id);
+    expect(res.data).toEqual([{ id: inserted.id, user_id: userA.id }]);
   });
 
   it("CONTROL: un admin SI puede leer los intentos de otros usuarios", async () => {
@@ -828,3 +854,104 @@ describe("7. quiz_attempts: rango de score (CHECK quiz_attempts_score_range_chec
     expect(zero.error).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+describe("8. course_certificates: nadie se emite certificados ni los lista (INSERT y SELECT publico retirados)", () => {
+  // userB ya tiene un certificado valido sembrado en la seccion 6
+  const bCode = () => `RLS-CERT-${runId.toUpperCase()}`;
+
+  it("BLOQUEO: un usuario normal no puede emitirse un certificado 'valid' propio (sin inscripcion ni quizzes)", async () => {
+    const forged = `FORJADO-${runId.toUpperCase()}`;
+    const res = await userA.client.from("course_certificates").insert({
+      code: forged,
+      user_id: userA.id,
+      course_id: course.id,
+      student_name: "Nombre Inventado",
+      course_title: "Titulo Inventado",
+      status: "valid",
+    });
+
+    expectInsertDenied(res);
+    const stored = must(
+      await service.from("course_certificates").select("id").eq("code", forged),
+      "releer",
+    );
+    expect(stored).toEqual([]);
+  });
+
+  it("BLOQUEO: un visitante anonimo no puede insertar certificados", async () => {
+    const forged = `FORJADO-ANON-${runId.toUpperCase()}`;
+    const res = await anon.from("course_certificates").insert({
+      code: forged,
+      user_id: userA.id,
+      course_id: course.id,
+      student_name: "X",
+      course_title: "Y",
+      status: "valid",
+    });
+
+    expectInsertDenied(res);
+  });
+
+  it("BLOQUEO: un visitante anonimo no puede listar certificados (ni por columnas ni por filtros parciales)", async () => {
+    // precondicion: existen certificados validos (el de B, sembrado en la seccion 6)
+    const exist = must(
+      await service.from("course_certificates").select("code").eq("code", bCode()),
+      "precondicion",
+    );
+    expect(exist).toHaveLength(1);
+
+    const all = await anon.from("course_certificates").select("code, student_name, user_id");
+    const like = await anon.from("course_certificates").select("code").like("code", "RLS-CERT-%");
+    const byName = await anon.from("course_certificates").select("code").ilike("student_name", "%");
+
+    for (const res of [all, like, byName]) {
+      if (res.error) {
+        expect(res.error.code).toBe("42501");
+      } else {
+        expect(res.data).toEqual([]);
+      }
+    }
+  });
+
+  it("BLOQUEO: un usuario autenticado no ve el certificado de otro usuario", async () => {
+    const res = await userA.client.from("course_certificates").select("code, user_id").eq("code", bCode());
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+
+    const mine = await userA.client.from("course_certificates").select("user_id");
+    expect(mine.error).toBeNull();
+    expect(mine.data?.every((r) => r.user_id === userA.id)).toBe(true);
+  });
+
+  it("CONTROL: el dueno SI lee su propio certificado", async () => {
+    const res = await userB.client.from("course_certificates").select("code, status").eq("code", bCode());
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([{ code: bCode(), status: "valid" }]);
+  });
+
+  it("CONTROL: un admin SI lee los certificados de otros", async () => {
+    const res = await admin.client.from("course_certificates").select("code").eq("code", bCode());
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([{ code: bCode() }]);
+  });
+
+  it("CONTROL: el flujo real SI emite el certificado: la server action escribe con service_role y el dueno lo lee", async () => {
+    const code = `RLS-REAL-${runId.toUpperCase()}`;
+    const issued = await service.from("course_certificates").insert({
+      code,
+      user_id: userA.id,
+      course_id: extraCourseId,
+      student_name: "Estudiante Real",
+      course_title: "Curso RLS",
+      status: "valid",
+    });
+    expect(issued.error).toBeNull();
+    cleanup.push(async () => service.from("course_certificates").delete().eq("code", code));
+
+    const res = await userA.client.from("course_certificates").select("code").eq("code", code);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([{ code }]);
+  });
+});
+
