@@ -1,0 +1,63 @@
+name: Backup DB to S3
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 America/Bogota (Colombia no usa horario de verano,
+    # asi que el offset UTC-5 es constante todo el año).
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Dump y subida a S3
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Procedimiento oficial de Supabase CLI para pg_dump/pg_dumpall
+      # (roles, esquema y datos en archivos separados, con --use-copy para
+      # que el archivo de datos use COPY en vez de INSERT por fila):
+      # https://supabase.com/docs/reference/cli/supabase-db-dump
+      #
+      # SUPABASE_DB_URL debe ser la cadena del session pooler (puerto 5432),
+      # no la del transaction pooler (6543): pg_dump necesita prepared
+      # statements, que el transaction pooler no soporta.
+      - name: Dump de roles, esquema y datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump/data.sql --data-only --use-copy
+
+      - name: Empaquetar y subir a S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%d-%H%M%SZ)"
+          archive="ivbcc-db-backup-${stamp}.tar.gz"
+          tar -czf "$archive" -C dump roles.sql schema.sql data.sql
+          aws s3 cp "$archive" "s3://${S3_BUCKET}/${archive}"
+          echo "Backup subido: s3://${S3_BUCKET}/${archive}"
+
+      - name: Limpiar archivos locales
+        if: always()
+        run: rm -rf dump ivbcc-db-backup-*.tar.gz
