@@ -1,7 +1,9 @@
 const BOM = "﻿";
 
 export function escapeCsvValue(value: string) {
-  return `"${value.replace(/"/g, '""')}"`;
+  const needsNeutralization = /^[=+\-@\t\r]/.test(value);
+  const normalized = needsNeutralization ? `'${value}` : value;
+  return `"${normalized.replace(/"/g, '""')}"`;
 }
 
 export function buildCsvResponse(
