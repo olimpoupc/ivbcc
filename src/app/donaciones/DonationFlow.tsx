@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { formatColombianPesos } from "@/lib/donations";
+import { formatColombianPesos, QUICK_AMOUNTS } from "@/lib/donations-format";
 import {
   createDonation,
   uploadDonationReceipt,
@@ -14,8 +14,6 @@ import {
 type Props = {
   methods: PublicDonationMethod[];
 };
-
-const QUICK_AMOUNTS = [10000, 20000, 50000, 100000];
 
 export default function DonationFlow({ methods }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);

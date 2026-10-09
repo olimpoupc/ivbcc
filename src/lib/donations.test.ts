@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  detectReceiptBinaryType,
   formatColombianPesos,
+  validateDonationAmount,
+  MIN_DONATION_AMOUNT,
+  MAX_DONATION_AMOUNT,
+  QUICK_AMOUNTS,
+} from "./donations-format";
+import {
+  detectReceiptBinaryType,
   generateReferenceCode,
   generateUploadToken,
   safeCompareTokens,
-  validateDonationAmount,
+  MAX_RECEIPT_BYTES,
 } from "./donations";
 
 describe("formatColombianPesos", () => {
@@ -143,3 +149,13 @@ describe("safeCompareTokens", () => {
     expect(safeCompareTokens("short", "longer-token-here")).toBe(false);
   });
 });
+
+describe("donations constants", () => {
+  it("defines standard Colombian donation constants", () => {
+    expect(MIN_DONATION_AMOUNT).toBe(1000);
+    expect(MAX_DONATION_AMOUNT).toBe(20000000);
+    expect(MAX_RECEIPT_BYTES).toBe(5 * 1024 * 1024);
+    expect(QUICK_AMOUNTS).toEqual([10000, 20000, 50000, 100000]);
+  });
+});
+

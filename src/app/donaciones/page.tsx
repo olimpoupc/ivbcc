@@ -1,6 +1,6 @@
 import Link from "next/link";
 import DonationFlow from "./DonationFlow";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabasePublicClient } from "@/lib/supabase-server";
 import { buildPageMetadata } from "@/lib/seo";
 import type { PublicDonationMethod } from "./actions";
 
@@ -14,17 +14,30 @@ export const metadata = buildPageMetadata({
 });
 
 export default async function DonacionesPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: methods, error } = await supabase
-    .from("donation_methods")
-    .select(
-      "id,title,method_type,description,account_holder,account_number,bank_name,document_number,phone,qr_image_url,payment_url,instructions"
-    )
-    .eq("is_active", true)
-    .order("order_index", { ascending: true })
-    .order("created_at", { ascending: false });
+  let activeMethods: PublicDonationMethod[] = [];
+  let loadFailed = false;
 
-  if (error) {
+  try {
+    const supabase = createSupabasePublicClient();
+    const { data: methods, error } = await supabase
+      .from("donation_methods")
+      .select(
+        "id,title,method_type,description,account_holder,account_number,bank_name,document_number,phone,qr_image_url,payment_url,instructions"
+      )
+      .eq("is_active", true)
+      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      loadFailed = true;
+    } else {
+      activeMethods = (methods || []) as PublicDonationMethod[];
+    }
+  } catch {
+    loadFailed = true;
+  }
+
+  if (loadFailed) {
     return (
       <main className="premium-page">
         <section className="site-shell-wide py-16">
@@ -35,8 +48,6 @@ export default async function DonacionesPage() {
       </main>
     );
   }
-
-  const activeMethods = (methods || []) as PublicDonationMethod[];
 
   return (
     <main className="premium-page">

@@ -12,7 +12,7 @@ import {
   quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
-import { formatColombianPesos } from "@/lib/donations";
+import { formatColombianPesos } from "@/lib/donations-format";
 import { DonationTabs } from "../DonationTabs";
 import DonationsRegistryPanel, {
   type DonationRow,

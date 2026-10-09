@@ -8,7 +8,7 @@ import {
   AdminEmptyState,
 } from "@/components/admin/AdminPrimitives";
 import { buildListHref } from "@/lib/admin-query";
-import { formatColombianPesos } from "@/lib/donations";
+import { formatColombianPesos } from "@/lib/donations-format";
 import {
   verifyDonation,
   rejectDonation,

@@ -1,39 +1,16 @@
+/**
+ * SERVER-ONLY: Este archivo contiene operaciones criptográficas con "node:crypto"
+ * y manejo de Buffer de Node.js.
+ * 
+ * ADVERTENCIA: NO debe importarse desde componentes de cliente (Client Components).
+ * Para funciones seguras en el navegador (formateo y montos), usa "@/lib/donations-format".
+ */
+
 import { randomBytes, timingSafeEqual } from "node:crypto";
 
-export const MIN_DONATION_AMOUNT = 1000;
-export const MAX_DONATION_AMOUNT = 20000000;
+export * from "./donations-format";
+
 export const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5 MB
-
-export function formatColombianPesos(amount: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-export function validateDonationAmount(amount: unknown): {
-  valid: boolean;
-  error?: string;
-  amount?: number;
-} {
-  if (typeof amount !== "number" || !Number.isInteger(amount)) {
-    return {
-      valid: false,
-      error: "El monto debe ser un número entero en pesos colombianos.",
-    };
-  }
-
-  if (amount < MIN_DONATION_AMOUNT || amount > MAX_DONATION_AMOUNT) {
-    return {
-      valid: false,
-      error: `El monto debe estar entre ${formatColombianPesos(MIN_DONATION_AMOUNT)} y ${formatColombianPesos(MAX_DONATION_AMOUNT)}.`,
-    };
-  }
-
-  return { valid: true, amount };
-}
 
 export function generateReferenceCode(date = new Date()): string {
   const year = date.getFullYear();
@@ -55,7 +32,9 @@ export type AllowedReceiptType = {
   extension: "jpg" | "png" | "webp" | "pdf";
 };
 
-export function detectReceiptBinaryType(bytes: Uint8Array): AllowedReceiptType | null {
+export function detectReceiptBinaryType(
+  bytes: Uint8Array
+): AllowedReceiptType | null {
   if (!bytes || bytes.length < 4) return null;
 
   // JPEG: FF D8 FF

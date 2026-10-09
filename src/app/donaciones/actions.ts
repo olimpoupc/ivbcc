@@ -2,13 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
+import { validateDonationAmount } from "@/lib/donations-format";
 import {
   detectReceiptBinaryType,
   generateReferenceCode,
   generateUploadToken,
   MAX_RECEIPT_BYTES,
   safeCompareTokens,
-  validateDonationAmount,
 } from "@/lib/donations";
 import { sanitizeText } from "@/lib/security";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase-server";
