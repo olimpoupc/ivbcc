@@ -9,6 +9,20 @@ describe("escapeCsvValue", () => {
   it("escapes embedded double quotes", () => {
     expect(escapeCsvValue('dijo "hola"')).toBe('"dijo ""hola"""');
   });
+
+  it("neutralizes formula injection characters (=, +, -, @, tab, CR)", () => {
+    expect(escapeCsvValue("=SUM(1+1)")).toBe('"\'=SUM(1+1)"');
+    expect(escapeCsvValue("+573001234567")).toBe('"\'+573001234567"');
+    expect(escapeCsvValue("-100")).toBe('"\' -100"'.replace(" ", ""));
+    expect(escapeCsvValue("@admin")).toBe('"\'@admin"');
+    expect(escapeCsvValue("\tTAB")).toBe('"\'\tTAB"');
+    expect(escapeCsvValue("\rCR")).toBe('"\'\rCR"');
+  });
+
+  it("does not prefix single quotes for regular text", () => {
+    expect(escapeCsvValue("Donación 2026")).toBe('"Donación 2026"');
+    expect(escapeCsvValue("usuario@email.com")).toBe('"usuario@email.com"');
+  });
 });
 
 describe("buildCsvResponse", () => {

@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import { quoteFilterValue } from "@/lib/admin-query";
 import { buildCsvResponse } from "@/lib/csv";
+import { getDonationFilterParts, parseDonationStatus } from "@/lib/donations-query";
+import { isValidIsoDate } from "@/lib/donations-range";
 
 const EXPORT_ROW_LIMIT = 20000;
 
@@ -20,6 +22,8 @@ const statusLabels: Record<string, string> = {
   read: "Leído",
   responded: "Respondido",
   archived: "Archivado",
+  verified: "Verificada",
+  rejected: "Rechazada",
 };
 
 function formatDateColombia(value?: string | null) {
@@ -165,6 +169,65 @@ export async function GET(
       ["Usuario", "Curso", "Fecha"],
       rows,
       "inscripciones-cursos-ivbcc.csv"
+    );
+  }
+
+  if (moduleName === "donations" || moduleName === "donaciones") {
+    // "estado" es el nombre nuevo; "status" se mantiene por compatibilidad.
+    const status = parseDonationStatus(searchParams.get("estado") ?? searchParams.get("status"));
+    // Fechas AAAA-MM-DD en hora de Colombia; si son inválidas se ignoran.
+    let desde = searchParams.get("desde");
+    let hasta = searchParams.get("hasta");
+    desde = isValidIsoDate(desde) ? desde : null;
+    hasta = isValidIsoDate(hasta) ? hasta : null;
+    if (desde && hasta && desde > hasta) [desde, hasta] = [hasta, desde];
+
+    const filters = getDonationFilterParts({ status, query, range: { desde, hasta } });
+
+    let dataQuery = supabase
+      .from("donations")
+      .select(
+        "reference_code,first_name,last_name,email,phone,amount,method_title,status,admin_note,verified_at,created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(EXPORT_ROW_LIMIT);
+
+    if (filters.status) dataQuery = dataQuery.eq("status", filters.status);
+    if (filters.orFilter) dataQuery = dataQuery.or(filters.orFilter);
+    if (filters.gte) dataQuery = dataQuery.gte("created_at", filters.gte);
+    if (filters.lt) dataQuery = dataQuery.lt("created_at", filters.lt);
+
+    const { data, error } = await dataQuery;
+    if (error) return queryFailed(error.message);
+
+    const rows = (data || []).map((donation) => [
+      donation.reference_code,
+      `${donation.first_name} ${donation.last_name}`,
+      donation.email || "",
+      donation.phone || "",
+      donation.method_title,
+      String(donation.amount),
+      statusLabels[donation.status] || donation.status,
+      donation.admin_note || "",
+      formatDateColombia(donation.created_at),
+      donation.verified_at ? formatDateColombia(donation.verified_at) : "",
+    ]);
+
+    return buildCsvResponse(
+      [
+        "Referencia",
+        "Donante",
+        "Correo",
+        "Teléfono",
+        "Método",
+        "Monto (COP)",
+        "Estado",
+        "Nota Admin",
+        "Fecha Creación",
+        "Fecha Verificación",
+      ],
+      rows,
+      `donaciones-ivbcc${desde ? `-desde-${desde}` : ""}${hasta ? `-hasta-${hasta}` : ""}.csv`
     );
   }
 
