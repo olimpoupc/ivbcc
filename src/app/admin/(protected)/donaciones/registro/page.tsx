@@ -9,11 +9,22 @@ import {
   getPageParam,
   getPageRange,
   getParam,
-  quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 import { formatColombianPesos } from "@/lib/donations-format";
+import { getDonationFilterParts, parseDonationStatus } from "@/lib/donations-query";
+import {
+  fetchInBatches,
+  getYearOptions,
+  groupDonationsByPeriod,
+  resolveDateFilter,
+  SUMMARY_MAX_ROWS,
+  toColombiaDate,
+  type DonationSummaryRow,
+} from "@/lib/donations-range";
 import { DonationTabs } from "../DonationTabs";
+import DonationDateFilters from "./DonationDateFilters";
+import DonationsMonthlySummary from "./DonationsMonthlySummary";
 import DonationsRegistryPanel, {
   type DonationRow,
 } from "./DonationsRegistryPanel";
@@ -21,6 +32,7 @@ import DonationsRegistryPanel, {
 export const revalidate = 0;
 
 const PAGE_SIZE = 15;
+const PATHNAME = "/admin/donaciones/registro";
 
 const donationSelect =
   "id,reference_code,first_name,last_name,email,phone,amount,method_title,receipt_path,status,admin_note,verified_at,created_at";
@@ -32,21 +44,30 @@ type Props = {
 export default async function AdminDonacionesRegistroPage({ searchParams }: Props) {
   const params = await searchParams;
   const query = getParam(params, "q")?.trim() || "";
-  const rawStatus = getParam(params, "status") || "all";
-  const validStatuses = ["pending", "verified", "rejected"] as const;
-  const statusFilter = (validStatuses as readonly string[]).includes(rawStatus)
-    ? (rawStatus as (typeof validStatuses)[number])
-    : "all";
+  const statusFilter = parseDonationStatus(getParam(params, "status"));
+
+  // Fechas calculadas en hora de Colombia (UTC-5)
+  const today = toColombiaDate(new Date());
+  const dateFilterParams = {
+    periodo: getParam(params, "periodo"),
+    anio: getParam(params, "anio"),
+    mes: getParam(params, "mes"),
+    desde: getParam(params, "desde"),
+    hasta: getParam(params, "hasta"),
+  };
+  const dateFilter = resolveDateFilter(dateFilterParams, today);
+  const filters = getDonationFilterParts({
+    status: statusFilter,
+    query,
+    range: dateFilter.range,
+  });
 
   const page = getPageParam(params);
   const { from, to } = getPageRange(page, PAGE_SIZE);
 
   const supabase = await createSupabaseServerClient();
 
-  // Consulta resumen con la función get_donation_summary()
-  const summaryPromise = supabase.rpc("get_donation_summary");
-
-  // Consulta de donaciones con filtros y búsqueda
+  // Listado paginado y conteo con los mismos filtros (sesión del admin + RLS)
   let dataQuery = supabase
     .from("donations")
     .select(donationSelect)
@@ -57,23 +78,50 @@ export default async function AdminDonacionesRegistroPage({ searchParams }: Prop
     .from("donations")
     .select("*", { count: "exact", head: true });
 
-  if (statusFilter !== "all") {
-    dataQuery = dataQuery.eq("status", statusFilter);
-    countQuery = countQuery.eq("status", statusFilter);
+  if (filters.status) {
+    dataQuery = dataQuery.eq("status", filters.status);
+    countQuery = countQuery.eq("status", filters.status);
+  }
+  if (filters.orFilter) {
+    dataQuery = dataQuery.or(filters.orFilter);
+    countQuery = countQuery.or(filters.orFilter);
+  }
+  if (filters.gte) {
+    dataQuery = dataQuery.gte("created_at", filters.gte);
+    countQuery = countQuery.gte("created_at", filters.gte);
+  }
+  if (filters.lt) {
+    dataQuery = dataQuery.lt("created_at", filters.lt);
+    countQuery = countQuery.lt("created_at", filters.lt);
   }
 
-  if (query) {
-    const likeVal = quoteFilterValue(`%${query}%`);
-    const orCondition = `first_name.ilike.${likeVal},last_name.ilike.${likeVal},reference_code.ilike.${likeVal},method_title.ilike.${likeVal}`;
-    dataQuery = dataQuery.or(orCondition);
-    countQuery = countQuery.or(orCondition);
-  }
+  // Totales sobre TODO el rango (no solo la página visible), en lotes de 1000
+  // filas con tope de 20000. Orden estable para que los lotes no se solapen.
+  const summaryPromise = fetchInBatches<DonationSummaryRow>((batchFrom, batchTo) => {
+    let summaryQuery = supabase
+      .from("donations")
+      .select("amount,status,created_at")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(batchFrom, batchTo);
 
-  const [{ data: summaryRows, error: summaryError }, { data, error }, { count }] =
-    await Promise.all([summaryPromise, dataQuery, countQuery]);
+    if (filters.status) summaryQuery = summaryQuery.eq("status", filters.status);
+    if (filters.orFilter) summaryQuery = summaryQuery.or(filters.orFilter);
+    if (filters.gte) summaryQuery = summaryQuery.gte("created_at", filters.gte);
+    if (filters.lt) summaryQuery = summaryQuery.lt("created_at", filters.lt);
 
-  if (error || summaryError) {
-    console.error("Error al cargar registro de donaciones:", error || summaryError);
+    return summaryQuery;
+  });
+
+  const [summaryResult, { data, error }, { count, error: countError }] = await Promise.all([
+    summaryPromise,
+    dataQuery,
+    countQuery,
+  ]);
+
+  const loadError = error || countError || summaryResult.error;
+  if (loadError) {
+    console.error("Error al cargar registro de donaciones:", loadError);
     return (
       <AdminPageShell>
         <AdminPageHeader
@@ -87,25 +135,30 @@ export default async function AdminDonacionesRegistroPage({ searchParams }: Prop
     );
   }
 
-  const summary = (summaryRows?.[0] as {
-    total_verificado: number | string;
-    cantidad_verificadas: number | string;
-    total_verificado_mes_actual: number | string;
-    cantidad_pendientes: number | string;
-    total_pendiente: number | string;
-    cantidad_rechazadas: number | string;
-  }) || {
-    total_verificado: 0,
-    cantidad_verificadas: 0,
-    total_verificado_mes_actual: 0,
-    cantidad_pendientes: 0,
-    total_pendiente: 0,
-    cantidad_rechazadas: 0,
-  };
+  const grouped = groupDonationsByPeriod(summaryResult.rows, dateFilter.range, today);
+  const totals = grouped.totals;
 
   const donations = (data || []) as DonationRow[];
   const totalItems = count || 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+  // Parámetros que la paginación y la búsqueda deben conservar
+  const listParams: Record<string, string | undefined> = {
+    periodo: dateFilterParams.periodo || undefined,
+    anio: dateFilterParams.anio || undefined,
+    mes: dateFilterParams.mes || undefined,
+    desde: dateFilterParams.desde || undefined,
+    hasta: dateFilterParams.hasta || undefined,
+  };
+
+  // El CSV recibe el rango ya resuelto (AAAA-MM-DD) y el estado actual
+  const exportSearch = new URLSearchParams();
+  if (query) exportSearch.set("q", query);
+  if (statusFilter !== "all") exportSearch.set("estado", statusFilter);
+  if (dateFilter.range.desde) exportSearch.set("desde", dateFilter.range.desde);
+  if (dateFilter.range.hasta) exportSearch.set("hasta", dateFilter.range.hasta);
+  const exportQueryString = exportSearch.toString();
+  const exportHref = `/api/export/donations${exportQueryString ? `?${exportQueryString}` : ""}`;
 
   return (
     <AdminPageShell>
@@ -123,51 +176,66 @@ export default async function AdminDonacionesRegistroPage({ searchParams }: Prop
 
       <DonationTabs current="registro" />
 
-      {/* Tarjetas de métricas calculadas por get_donation_summary() */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <DonationDateFilters
+        pathname={PATHNAME}
+        filter={dateFilter}
+        yearOptions={getYearOptions(today)}
+        query={query}
+        status={statusFilter}
+      />
+
+      {summaryResult.truncated && (
+        <div
+          role="status"
+          className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
+        >
+          Este periodo tiene más de {SUMMARY_MAX_ROWS.toLocaleString("es-CO")} donaciones, así que
+          los totales y el resumen solo cuentan las primeras{" "}
+          {SUMMARY_MAX_ROWS.toLocaleString("es-CO")}. Elige un rango de fechas más corto para ver
+          cifras exactas.
+        </div>
+      )}
+
+      {/* Tarjetas: solo las donaciones verificadas suman al total */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <AdminMetricCard
           label="Total verificado"
-          value={formatColombianPesos(Number(summary.total_verificado))}
-          detail={`${summary.cantidad_verificadas} aprobadas`}
+          value={formatColombianPesos(totals.verifiedTotal)}
+          detail={dateFilter.label}
           icon="check"
           tone="gold"
         />
 
         <AdminMetricCard
-          label="Verificado este mes"
-          value={formatColombianPesos(Number(summary.total_verificado_mes_actual))}
-          detail="Mes en curso"
+          label="Donaciones verificadas"
+          value={totals.verifiedCount}
+          detail="Cantidad en el periodo"
           icon="analytics"
           tone="navy"
         />
 
         <AdminMetricCard
-          label="Aportes verificados"
-          value={Number(summary.cantidad_verificadas)}
-          detail="Total histórico"
-          icon="check"
-          tone="slate"
-        />
-
-        <AdminMetricCard
           label="Pendientes por conciliar"
-          value={Number(summary.cantidad_pendientes)}
-          detail={`Valor: ${formatColombianPesos(Number(summary.total_pendiente))}`}
+          value={totals.pendingCount}
+          detail={`Valor: ${formatColombianPesos(totals.pendingTotal)}`}
           icon="spark"
           tone="slate"
         />
 
         <AdminMetricCard
           label="Rechazadas"
-          value={Number(summary.cantidad_rechazadas)}
-          detail="Transferencias no coincidentes"
+          value={totals.rejectedCount}
+          detail={`Valor: ${formatColombianPesos(totals.rejectedTotal)}`}
           icon="close"
           tone="slate"
         />
       </section>
 
+      <DonationsMonthlySummary summary={grouped} />
+
       {/* Panel de registro con filtros, búsqueda, tabla y comprobantes */}
       <DonationsRegistryPanel
+        key={`${query}|${statusFilter}`}
         initialDonations={donations}
         query={query}
         status={statusFilter}
@@ -175,6 +243,8 @@ export default async function AdminDonacionesRegistroPage({ searchParams }: Prop
         totalPages={totalPages}
         totalItems={totalItems}
         pageSize={PAGE_SIZE}
+        listParams={listParams}
+        exportHref={exportHref}
       />
     </AdminPageShell>
   );

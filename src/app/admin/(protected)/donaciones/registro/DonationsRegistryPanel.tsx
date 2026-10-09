@@ -12,6 +12,7 @@ import { formatColombianPesos } from "@/lib/donations-format";
 import {
   verifyDonation,
   rejectDonation,
+  revertDonationToPending,
   getReceiptSignedUrl,
 } from "./actions";
 
@@ -39,7 +40,13 @@ type Props = {
   totalPages: number;
   totalItems: number;
   pageSize: number;
+  /** Filtros de fecha de la URL que la paginación debe conservar. */
+  listParams: Record<string, string | undefined>;
+  /** Enlace de exportación con el mismo rango, estado y búsqueda. */
+  exportHref: string;
 };
+
+type ActionType = "verify" | "reject" | "revert";
 
 const statusFilterOptions = [
   { value: "all", label: "Todos los estados" },
@@ -68,6 +75,8 @@ export default function DonationsRegistryPanel({
   totalPages,
   totalItems,
   pageSize,
+  listParams,
+  exportHref,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -78,7 +87,7 @@ export default function DonationsRegistryPanel({
 
   // Estado para modal/diálogo de acción (verificar / rechazar)
   const [actionModal, setActionModal] = useState<{
-    type: "verify" | "reject";
+    type: ActionType;
     donation: DonationRow;
   } | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState("");
@@ -135,13 +144,20 @@ export default function DonationsRegistryPanel({
 
     startTransition(async () => {
       const { type, donation } = actionModal;
-      const res =
-        type === "verify"
-          ? await verifyDonation(donation.id, adminNoteInput)
-          : await rejectDonation(donation.id, adminNoteInput);
+      try {
+        const res =
+          type === "verify"
+            ? await verifyDonation(donation.id, adminNoteInput)
+            : type === "reject"
+              ? await rejectDonation(donation.id, adminNoteInput)
+              : await revertDonationToPending(donation.id);
 
-      if (!res.success) {
-        setActionError(res.error || "Error al procesar la acción.");
+        if (!res.success) {
+          setActionError(res.error || "Error al procesar la acción.");
+          return;
+        }
+      } catch {
+        setActionError("No hubo conexión con el servidor. Revisa tu internet e inténtalo de nuevo.");
         return;
       }
 
@@ -150,10 +166,17 @@ export default function DonationsRegistryPanel({
     });
   };
 
-  const exportUrl = `/api/export/donations?${new URLSearchParams({
-    q: query,
-    status: status,
-  }).toString()}`;
+  const openActionModal = (type: ActionType, donation: DonationRow) => {
+    setActionError(null);
+    setAdminNoteInput(donation.admin_note || "");
+    setActionModal({ type, donation });
+  };
+
+  const closeActionModal = () => {
+    if (isPending) return;
+    setActionModal(null);
+    setActionError(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -193,11 +216,11 @@ export default function DonationsRegistryPanel({
           </select>
 
           <a
-            href={exportUrl}
+            href={exportHref}
             download
             className="btn-ghost rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 flex items-center gap-2"
           >
-            <span>Descargar CSV</span>
+            <span>Exportar CSV</span>
           </a>
         </div>
       </div>
@@ -206,11 +229,7 @@ export default function DonationsRegistryPanel({
       {initialDonations.length === 0 ? (
         <AdminEmptyState
           title="No se encontraron donaciones"
-          description={
-            query || status !== "all"
-              ? "Prueba cambiando los filtros o el texto de búsqueda."
-              : "Aún no hay registros de donaciones en el sistema."
-          }
+          description="No hay donaciones en este periodo con los filtros elegidos. Prueba con otro rango de fechas, otro estado o «Limpiar filtros»."
         />
       ) : (
         <div className="premium-surface overflow-hidden rounded-[24px]">
@@ -287,27 +306,41 @@ export default function DonationsRegistryPanel({
 
                     <td className="py-4 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdminNoteInput(d.admin_note || "");
-                            setActionModal({ type: "verify", donation: d });
-                          }}
-                          className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                        >
-                          Verificar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdminNoteInput(d.admin_note || "");
-                            setActionModal({ type: "reject", donation: d });
-                          }}
-                          className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-700 transition"
-                        >
-                          Rechazar
-                        </button>
+                        {d.status === "pending" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openActionModal("verify", d)}
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                            >
+                              Verificar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openActionModal("reject", d)}
+                              className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-700 transition"
+                            >
+                              Rechazar
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openActionModal("revert", d)}
+                            className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            Volver a pendiente
+                          </button>
+                        )}
                       </div>
+                      {d.admin_note && (
+                        <p
+                          className="mt-1 ml-auto max-w-[220px] truncate text-right text-[11px] text-slate-400"
+                          title={d.admin_note}
+                        >
+                          Nota: {d.admin_note}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -323,6 +356,7 @@ export default function DonationsRegistryPanel({
               pageSize={pageSize}
               buildHref={(newPage) =>
                 buildListHref(pathname, {
+                  ...listParams,
                   q: query,
                   status: status !== "all" ? status : undefined,
                   page: String(newPage),
@@ -333,52 +367,93 @@ export default function DonationsRegistryPanel({
         </div>
       )}
 
-      {/* Modal para acción administrativa (Verificar / Rechazar) */}
+      {/* Diálogo de confirmación: Verificar / Rechazar / Volver a pendiente */}
       {actionModal && (
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="donation-action-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closeActionModal();
+          }}
         >
           <div className="premium-surface w-full max-w-md rounded-[28px] p-6 shadow-2xl space-y-4">
-            <h3 className="section-title text-xl text-slate-950">
-              {actionModal.type === "verify" ? "Verificar donación" : "Rechazar donación"}
+            <h3 id="donation-action-title" className="section-title text-xl text-slate-950">
+              {actionModal.type === "verify"
+                ? "Verificar donación"
+                : actionModal.type === "reject"
+                  ? "Rechazar donación"
+                  : "Volver a pendiente"}
             </h3>
 
-            <p className="text-sm text-slate-600">
-              Estás a punto de marcar como{" "}
-              <strong className="text-slate-900 font-bold">
-                {actionModal.type === "verify" ? "verificada" : "rechazada"}
-              </strong>{" "}
-              la donación <span className="font-mono">{actionModal.donation.reference_code}</span> de{" "}
-              {actionModal.donation.first_name} {actionModal.donation.last_name} por{" "}
-              <strong>{formatColombianPesos(actionModal.donation.amount)}</strong>.
+            {actionModal.type === "verify" ? (
+              <p className="text-base font-semibold text-slate-800">
+                ¿Confirmas que ya llegó la transferencia de{" "}
+                <strong className="font-black text-slate-950">
+                  {formatColombianPesos(actionModal.donation.amount)}
+                </strong>
+                ? Se sumará a los totales.
+              </p>
+            ) : actionModal.type === "reject" ? (
+              <p className="text-sm text-slate-600">
+                ¿Confirmas que la transferencia de{" "}
+                <strong className="text-slate-900">
+                  {formatColombianPesos(actionModal.donation.amount)}
+                </strong>{" "}
+                no llegó o no coincide? Quedará como rechazada y no sumará a los totales.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600">
+                ¿Devolver esta donación de{" "}
+                <strong className="text-slate-900">
+                  {formatColombianPesos(actionModal.donation.amount)}
+                </strong>{" "}
+                a pendiente? Úsalo solo si hubo un error.{" "}
+                {actionModal.donation.status === "verified"
+                  ? "Dejará de sumar a los totales verificados."
+                  : "Volverá a la lista de pendientes por revisar."}
+              </p>
+            )}
+
+            <p className="text-xs text-slate-500">
+              <span className="font-mono font-bold text-slate-700">
+                {actionModal.donation.reference_code}
+              </span>{" "}
+              · {actionModal.donation.first_name} {actionModal.donation.last_name} ·{" "}
+              {actionModal.donation.method_title}
             </p>
 
             {actionError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"
+              >
                 {actionError}
               </div>
             )}
 
-            <div>
-              <label htmlFor="admin-note-input" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Nota administrativa (Opcional):
-              </label>
-              <textarea
-                id="admin-note-input"
-                rows={3}
-                value={adminNoteInput}
-                onChange={(e) => setAdminNoteInput(e.target.value)}
-                placeholder="Observación o comprobante de conciliación..."
-                className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]/20"
-              />
-            </div>
+            {actionModal.type !== "revert" && (
+              <div>
+                <label htmlFor="admin-note-input" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Nota administrativa (Opcional):
+                </label>
+                <textarea
+                  id="admin-note-input"
+                  rows={3}
+                  value={adminNoteInput}
+                  onChange={(e) => setAdminNoteInput(e.target.value)}
+                  placeholder="Observación o comprobante de conciliación..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--ivbcc-gold)]/20"
+                />
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setActionModal(null)}
+                onClick={closeActionModal}
+                disabled={isPending}
                 className="btn-ghost text-xs px-4 py-2 font-bold text-slate-600"
               >
                 Cancelar
@@ -387,17 +462,21 @@ export default function DonationsRegistryPanel({
                 type="button"
                 disabled={isPending}
                 onClick={handleConfirmAction}
-                className={`rounded-full px-5 py-2 text-xs font-black text-white shadow transition ${
+                className={`rounded-full px-5 py-2 text-xs font-black text-white shadow transition disabled:opacity-60 ${
                   actionModal.type === "verify"
                     ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-red-600 hover:bg-red-700"
+                    : actionModal.type === "reject"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-[var(--ivbcc-navy)] hover:opacity-90"
                 }`}
               >
                 {isPending
                   ? "Procesando..."
                   : actionModal.type === "verify"
-                    ? "Confirmar verificación"
-                    : "Confirmar rechazo"}
+                    ? "Sí"
+                    : actionModal.type === "reject"
+                      ? "Sí, rechazar"
+                      : "Sí, volver a pendiente"}
               </button>
             </div>
           </div>

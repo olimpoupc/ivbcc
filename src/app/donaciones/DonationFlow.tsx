@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatColombianPesos, QUICK_AMOUNTS } from "@/lib/donations-format";
@@ -15,8 +15,106 @@ type Props = {
   methods: PublicDonationMethod[];
 };
 
+type CreatedDonation = {
+  id: string;
+  reference_code: string;
+  amount: number;
+  method_title: string;
+  upload_token: string;
+  created_at: string;
+};
+
+type StoredPendingDonation = {
+  donation: CreatedDonation;
+  method: PublicDonationMethod;
+};
+
+// Mientras la donación está pendiente guardamos el código y el token en
+// sessionStorage (solo esta pestaña) para que recargar no los pierda.
+const PENDING_STORAGE_KEY = "ivbcc:donacion-pendiente";
+// El servidor solo acepta comprobantes durante las primeras 24 horas.
+const RECEIPT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+const ALLOWED_RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+const NETWORK_ERROR_MESSAGE =
+  "No pudimos registrar tu donación. Revisa tu conexión a internet e inténtalo de nuevo o escríbenos por la página de contacto.";
+const UPLOAD_NETWORK_ERROR_MESSAGE =
+  "No pudimos subir tu comprobante. Revisa tu conexión a internet e inténtalo de nuevo.";
+
+function isStoredPendingDonation(value: unknown): value is StoredPendingDonation {
+  if (!value || typeof value !== "object") return false;
+  const { donation, method } = value as Partial<StoredPendingDonation>;
+  return Boolean(
+    donation &&
+      method &&
+      typeof donation.reference_code === "string" &&
+      typeof donation.upload_token === "string" &&
+      typeof donation.amount === "number" &&
+      typeof donation.created_at === "string" &&
+      typeof method.title === "string"
+  );
+}
+
+function parseStoredPendingDonation(raw: string | null): StoredPendingDonation | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isStoredPendingDonation(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Lectura de sessionStorage para useSyncExternalStore. Devuelve el texto
+// guardado (estable entre lecturas) y descarta lo vencido o dañado.
+function getStoredSnapshot(): string | null {
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_STORAGE_KEY);
+    const parsed = parseStoredPendingDonation(raw);
+    const isFresh =
+      parsed !== null &&
+      Date.now() - new Date(parsed.donation.created_at).getTime() < RECEIPT_WINDOW_MS;
+    if (raw && !isFresh) {
+      window.sessionStorage.removeItem(PENDING_STORAGE_KEY);
+      return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+// En el servidor no hay sessionStorage: siempre se empieza en el paso 1.
+const getServerSnapshot = () => null;
+// sessionStorage no avisa cambios dentro de la misma pestaña; cada render
+// vuelve a leerlo y nosotros mismos provocamos el render al escribir.
+const subscribeToNothing = () => () => {};
+
+function saveStoredPendingDonation(value: StoredPendingDonation) {
+  try {
+    window.sessionStorage.setItem(PENDING_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Sin almacenamiento (modo privado o bloqueado): el flujo sigue igual.
+  }
+}
+
+function clearStoredPendingDonation() {
+  try {
+    window.sessionStorage.removeItem(PENDING_STORAGE_KEY);
+  } catch {
+    // Nada que limpiar si el almacenamiento no está disponible.
+  }
+}
+
+const STEPS = [
+  { number: 1, label: "Tus datos" },
+  { number: 2, label: "Transferencia y comprobante" },
+  { number: 3, label: "Listo" },
+] as const;
+
 export default function DonationFlow({ methods }: Props) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [stepState, setStep] = useState<1 | 2 | 3>(1);
   const [isPending, startTransition] = useTransition();
 
   // Paso 1: Form state
@@ -33,16 +131,23 @@ export default function DonationFlow({ methods }: Props) {
   const [step1Error, setStep1Error] = useState<string | null>(null);
 
   // Paso 2: Donación creada
-  const [createdDonation, setCreatedDonation] = useState<{
-    id: string;
-    reference_code: string;
-    amount: number;
-    method_title: string;
-    upload_token: string;
-  } | null>(null);
-  const [currentMethod, setCurrentMethod] = useState<PublicDonationMethod | null>(
+  const [donationState, setCreatedDonation] = useState<CreatedDonation | null>(null);
+  const [methodState, setCurrentMethod] = useState<PublicDonationMethod | null>(
     null
   );
+
+  // Si el donante recargó o reabrió la pestaña en el paso 2, recuperamos la
+  // donación pendiente para que no pierda el código ni el comprobante.
+  const storedRaw = useSyncExternalStore(
+    subscribeToNothing,
+    getStoredSnapshot,
+    getServerSnapshot
+  );
+  const storedPending = useMemo(() => parseStoredPendingDonation(storedRaw), [storedRaw]);
+  const restoredFromSession = donationState === null && storedPending !== null;
+  const createdDonation = donationState ?? storedPending?.donation ?? null;
+  const currentMethod = methodState ?? storedPending?.method ?? null;
+  const step = stepState === 1 && storedPending ? 2 : stepState;
 
   // Paso 2: Subida de comprobante
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -52,10 +157,14 @@ export default function DonationFlow({ methods }: Props) {
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2500);
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2500);
+    } catch {
+      setCopiedKey(null);
+    }
   };
 
   const handleAmountQuickSelect = (val: number) => {
@@ -103,21 +212,29 @@ export default function DonationFlow({ methods }: Props) {
     }
 
     startTransition(async () => {
-      const res: CreateDonationResult = await createDonation({
-        firstName,
-        lastName,
-        email: email.trim() ? email : undefined,
-        phone: phone.trim() ? phone : undefined,
-        donationMethodId: selectedMethodId,
-        amount,
-        dataConsent,
-      });
+      // Si algo falla, los campos del formulario se conservan tal cual.
+      let res: CreateDonationResult;
+      try {
+        res = await createDonation({
+          firstName,
+          lastName,
+          email: email.trim() ? email : undefined,
+          phone: phone.trim() ? phone : undefined,
+          donationMethodId: selectedMethodId,
+          amount,
+          dataConsent,
+        });
+      } catch {
+        setStep1Error(NETWORK_ERROR_MESSAGE);
+        return;
+      }
 
       if (!res.success) {
         setStep1Error(res.error);
         return;
       }
 
+      saveStoredPendingDonation({ donation: res.donation, method: res.method });
       setCreatedDonation(res.donation);
       setCurrentMethod(res.method);
       setStep(2);
@@ -134,6 +251,16 @@ export default function DonationFlow({ methods }: Props) {
       return;
     }
 
+    if (!ALLOWED_RECEIPT_TYPES.includes(receiptFile.type)) {
+      setUploadError("El comprobante debe ser una imagen (JPG, PNG o WebP) o un PDF.");
+      return;
+    }
+
+    if (receiptFile.size > MAX_RECEIPT_BYTES) {
+      setUploadError("El archivo pesa más de 5 MB. Prueba con una captura de pantalla o un archivo más liviano.");
+      return;
+    }
+
     if (!createdDonation) return;
 
     startTransition(async () => {
@@ -142,12 +269,22 @@ export default function DonationFlow({ methods }: Props) {
       formData.set("uploadToken", createdDonation.upload_token);
       formData.set("receiptFile", receiptFile);
 
-      const res = await uploadDonationReceipt(formData);
+      let res: Awaited<ReturnType<typeof uploadDonationReceipt>>;
+      try {
+        res = await uploadDonationReceipt(formData);
+      } catch {
+        setUploadError(UPLOAD_NETWORK_ERROR_MESSAGE);
+        return;
+      }
+
       if (!res.success) {
         setUploadError(res.error);
         return;
       }
 
+      setCreatedDonation(createdDonation);
+      setCurrentMethod(currentMethod);
+      clearStoredPendingDonation();
       setUploadedReceiptPath(res.receiptPath);
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -155,11 +292,16 @@ export default function DonationFlow({ methods }: Props) {
   };
 
   const handleFinishWithoutReceipt = () => {
+    // Pasamos la donación al estado antes de borrar la copia guardada.
+    setCreatedDonation(createdDonation);
+    setCurrentMethod(currentMethod);
+    clearStoredPendingDonation();
     setStep(3);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const resetFlow = () => {
+    clearStoredPendingDonation();
     setFirstName("");
     setLastName("");
     setEmail("");
@@ -181,61 +323,42 @@ export default function DonationFlow({ methods }: Props) {
     <div className="w-full max-w-4xl mx-auto space-y-8">
       {/* Indicador de pasos */}
       <nav aria-label="Progreso de donación" className="premium-surface rounded-2xl p-4">
-        <ol className="flex items-center justify-between gap-2 sm:gap-4 text-xs sm:text-sm font-bold">
-          <li
-            className={`flex items-center gap-2 ${
-              step >= 1 ? "text-[var(--ivbcc-navy)] font-black" : "text-slate-400"
-            }`}
-          >
-            <span
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs transition ${
-                step > 1
-                  ? "bg-emerald-600 text-white"
-                  : step === 1
-                    ? "bg-[var(--ivbcc-navy)] text-white shadow"
-                    : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              {step > 1 ? "✓" : "1"}
-            </span>
-            <span>Tus datos</span>
-          </li>
-          <div className="h-0.5 flex-1 bg-slate-200" />
-          <li
-            className={`flex items-center gap-2 ${
-              step >= 2 ? "text-[var(--ivbcc-navy)] font-black" : "text-slate-400"
-            }`}
-          >
-            <span
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs transition ${
-                step > 2
-                  ? "bg-emerald-600 text-white"
-                  : step === 2
-                    ? "bg-[var(--ivbcc-navy)] text-white shadow"
-                    : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              {step > 2 ? "✓" : "2"}
-            </span>
-            <span>Transferencia</span>
-          </li>
-          <div className="h-0.5 flex-1 bg-slate-200" />
-          <li
-            className={`flex items-center gap-2 ${
-              step === 3 ? "text-[var(--ivbcc-navy)] font-black" : "text-slate-400"
-            }`}
-          >
-            <span
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs transition ${
-                step === 3
-                  ? "bg-[var(--ivbcc-navy)] text-white shadow"
-                  : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              3
-            </span>
-            <span>Confirmación</span>
-          </li>
+        <ol className="flex flex-col gap-3 text-xs font-bold sm:flex-row sm:items-center sm:gap-4 sm:text-sm">
+          {STEPS.map((item, index) => {
+            const isDone = step > item.number || (item.number === 3 && step === 3);
+            const isCurrent = step === item.number;
+            return (
+              <li
+                key={item.number}
+                aria-current={isCurrent ? "step" : undefined}
+                className={`flex items-center gap-2 ${index < STEPS.length - 1 ? "sm:flex-1" : ""}`}
+              >
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs transition ${
+                    isDone
+                      ? "bg-emerald-600 text-white"
+                      : isCurrent
+                        ? "bg-[var(--ivbcc-navy)] text-white shadow"
+                        : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {isDone ? "✓" : item.number}
+                </span>
+                <span
+                  className={
+                    isCurrent || isDone
+                      ? "text-[var(--ivbcc-navy)] font-black"
+                      : "text-slate-400"
+                  }
+                >
+                  {item.number}. {item.label}
+                </span>
+                {index < STEPS.length - 1 && (
+                  <span aria-hidden="true" className="hidden h-0.5 flex-1 bg-slate-200 sm:block" />
+                )}
+              </li>
+            );
+          })}
         </ol>
       </nav>
 
@@ -258,7 +381,14 @@ export default function DonationFlow({ methods }: Props) {
                 role="alert"
                 className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 font-semibold"
               >
-                {step1Error}
+                <p>{step1Error}</p>
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  Tus datos siguen en el formulario. Si el problema continúa,{" "}
+                  <Link href="/contacto" className="underline underline-offset-2">
+                    escríbenos por la página de contacto
+                  </Link>
+                  .
+                </p>
               </div>
             )}
 
@@ -443,8 +573,11 @@ export default function DonationFlow({ methods }: Props) {
               disabled={isPending || methods.length === 0}
               className="btn-primary w-full py-4 text-base font-black shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2"
             >
-              {isPending ? "Generando tu registro..." : "Continuar con el pago"}
+              {isPending ? "Registrando tu donación..." : "Continuar: ver datos para transferir"}
             </button>
+            <p className="text-center text-xs sm:text-sm text-slate-500">
+              En el siguiente paso verás a dónde transferir y podrás subir tu comprobante
+            </p>
           </form>
         </section>
       )}
@@ -455,6 +588,14 @@ export default function DonationFlow({ methods }: Props) {
           {/* Tarjeta de instrucciones y código de referencia */}
           <div className="premium-surface rounded-[30px] p-6 sm:p-10 shadow-xl border border-slate-100">
             <span className="badge">Paso 2 de 3</span>
+            {restoredFromSession && (
+              <p
+                role="status"
+                className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs sm:text-sm font-semibold text-sky-900"
+              >
+                Recuperamos tu donación pendiente para que puedas terminarla.
+              </p>
+            )}
             <h2 className="section-title mt-2 text-3xl sm:text-4xl text-gray-950">
               Dona {formatColombianPesos(createdDonation.amount)} a {currentMethod.title}
             </h2>
@@ -609,7 +750,7 @@ export default function DonationFlow({ methods }: Props) {
               Adjuntar comprobante de pago
             </h3>
             <p className="muted-copy mt-1 text-sm">
-              Sube una captura de pantalla, imagen (JPG, PNG, WebP) o PDF de la transferencia realizada (máx. 5 MB).
+              Cuando hayas transferido, sube una captura de pantalla, imagen (JPG, PNG, WebP) o PDF del comprobante (máx. 5 MB). Si aún no lo tienes, puedes terminar sin comprobante.
             </p>
 
             <form onSubmit={handleReceiptUpload} className="mt-6 space-y-4">
@@ -629,9 +770,8 @@ export default function DonationFlow({ methods }: Props) {
                   accept="image/jpeg,image/png,image/webp,application/pdf"
                   onChange={(e) => {
                     const files = e.target.files;
-                    if (files && files[0]) {
-                      setReceiptFile(files[0]);
-                    }
+                    setUploadError(null);
+                    setReceiptFile(files && files[0] ? files[0] : null);
                   }}
                   className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-[var(--ivbcc-navy)] file:text-white hover:file:opacity-90 cursor-pointer"
                 />

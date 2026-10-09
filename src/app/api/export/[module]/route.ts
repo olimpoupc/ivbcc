@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import { quoteFilterValue } from "@/lib/admin-query";
 import { buildCsvResponse } from "@/lib/csv";
+import { getDonationFilterParts, parseDonationStatus } from "@/lib/donations-query";
+import { isValidIsoDate } from "@/lib/donations-range";
 
 const EXPORT_ROW_LIMIT = 20000;
 
@@ -171,7 +173,16 @@ export async function GET(
   }
 
   if (moduleName === "donations" || moduleName === "donaciones") {
-    const status = searchParams.get("status") || "all";
+    // "estado" es el nombre nuevo; "status" se mantiene por compatibilidad.
+    const status = parseDonationStatus(searchParams.get("estado") ?? searchParams.get("status"));
+    // Fechas AAAA-MM-DD en hora de Colombia; si son inválidas se ignoran.
+    let desde = searchParams.get("desde");
+    let hasta = searchParams.get("hasta");
+    desde = isValidIsoDate(desde) ? desde : null;
+    hasta = isValidIsoDate(hasta) ? hasta : null;
+    if (desde && hasta && desde > hasta) [desde, hasta] = [hasta, desde];
+
+    const filters = getDonationFilterParts({ status, query, range: { desde, hasta } });
 
     let dataQuery = supabase
       .from("donations")
@@ -181,13 +192,10 @@ export async function GET(
       .order("created_at", { ascending: false })
       .limit(EXPORT_ROW_LIMIT);
 
-    if (status !== "all") dataQuery = dataQuery.eq("status", status);
-    if (query) {
-      const likeValue = quoteFilterValue(`%${query}%`);
-      dataQuery = dataQuery.or(
-        `first_name.ilike.${likeValue},last_name.ilike.${likeValue},reference_code.ilike.${likeValue},method_title.ilike.${likeValue}`
-      );
-    }
+    if (filters.status) dataQuery = dataQuery.eq("status", filters.status);
+    if (filters.orFilter) dataQuery = dataQuery.or(filters.orFilter);
+    if (filters.gte) dataQuery = dataQuery.gte("created_at", filters.gte);
+    if (filters.lt) dataQuery = dataQuery.lt("created_at", filters.lt);
 
     const { data, error } = await dataQuery;
     if (error) return queryFailed(error.message);
@@ -219,7 +227,7 @@ export async function GET(
         "Fecha Verificación",
       ],
       rows,
-      "donaciones-ivbcc.csv"
+      `donaciones-ivbcc${desde ? `-desde-${desde}` : ""}${hasta ? `-hasta-${hasta}` : ""}.csv`
     );
   }
 

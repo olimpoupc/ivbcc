@@ -67,6 +67,28 @@ export type UploadReceiptResult =
       error: string;
     };
 
+// Mensajes para el donante: claros, amables y sin detalles técnicos.
+const CREATE_FAILED_MESSAGE =
+  "No pudimos registrar tu donación. Inténtalo de nuevo o escríbenos por la página de contacto.";
+const UPLOAD_FAILED_MESSAGE =
+  "No pudimos guardar tu comprobante. Inténtalo de nuevo o escríbenos por la página de contacto con tu código de referencia.";
+
+type ServiceRoleClient = ReturnType<typeof createSupabaseServiceRoleClient>;
+
+/**
+ * Devuelve el cliente service_role o null si falta la configuración. El
+ * detalle solo se registra en el servidor; el donante ve un mensaje genérico.
+ */
+function getServiceRoleClient(context: string): ServiceRoleClient | null {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    console.error(
+      `[donaciones] ${context}: falta la variable de entorno SUPABASE_SERVICE_ROLE_KEY o NEXT_PUBLIC_SUPABASE_URL en el servidor.`
+    );
+    return null;
+  }
+  return createSupabaseServiceRoleClient();
+}
+
 async function getClientIp(): Promise<string> {
   const headerList = await headers();
   const forwardedFor = headerList.get("x-forwarded-for");
@@ -79,12 +101,14 @@ async function getClientIp(): Promise<string> {
   return "127.0.0.1";
 }
 
+// "error" se trata igual que "blocked" (no se deja pasar la solicitud), pero
+// permite mostrar un mensaje honesto en vez de "demasiados intentos".
 async function verifyRateLimit(
-  serviceRole: ReturnType<typeof createSupabaseServiceRoleClient>,
+  serviceRole: ServiceRoleClient,
   key: string,
   limit: number,
   windowSeconds = 3600
-): Promise<boolean> {
+): Promise<"allowed" | "blocked" | "error"> {
   const { data: allowed, error } = await serviceRole.rpc("check_rate_limit", {
     p_key: key,
     p_limit: limit,
@@ -93,21 +117,38 @@ async function verifyRateLimit(
 
   if (error) {
     console.error("Error al verificar límite de frecuencia:", error);
-    return false;
+    return "error";
   }
 
-  return Boolean(allowed);
+  return allowed ? "allowed" : "blocked";
 }
 
 export async function createDonation(
   input: CreateDonationInput
 ): Promise<CreateDonationResult> {
-  const serviceRole = createSupabaseServiceRoleClient();
+  try {
+    return await registerDonation(input);
+  } catch (error) {
+    console.error("Error inesperado al registrar donación:", error);
+    return { success: false, error: CREATE_FAILED_MESSAGE };
+  }
+}
+
+async function registerDonation(
+  input: CreateDonationInput
+): Promise<CreateDonationResult> {
+  const serviceRole = getServiceRoleClient("createDonation");
+  if (!serviceRole) {
+    return { success: false, error: CREATE_FAILED_MESSAGE };
+  }
   const clientIp = await getClientIp();
 
   // Límite de frecuencia: 5 por hora por IP
-  const allowed = await verifyRateLimit(serviceRole, `donation:${clientIp}`, 5, 3600);
-  if (!allowed) {
+  const rateLimit = await verifyRateLimit(serviceRole, `donation:${clientIp}`, 5, 3600);
+  if (rateLimit === "error") {
+    return { success: false, error: CREATE_FAILED_MESSAGE };
+  }
+  if (rateLimit === "blocked") {
     return {
       success: false,
       error: getUserFacingErrorMessage(
@@ -218,7 +259,7 @@ export async function createDonation(
     console.error("Error al registrar donación:", insertError);
     return {
       success: false,
-      error: "No fue posible registrar la donación. Por favor, intenta de nuevo.",
+      error: CREATE_FAILED_MESSAGE,
     };
   }
 
@@ -252,17 +293,34 @@ export async function createDonation(
 export async function uploadDonationReceipt(
   formData: FormData
 ): Promise<UploadReceiptResult> {
-  const serviceRole = createSupabaseServiceRoleClient();
+  try {
+    return await storeDonationReceipt(formData);
+  } catch (error) {
+    console.error("Error inesperado al subir comprobante de donación:", error);
+    return { success: false, error: UPLOAD_FAILED_MESSAGE };
+  }
+}
+
+async function storeDonationReceipt(
+  formData: FormData
+): Promise<UploadReceiptResult> {
+  const serviceRole = getServiceRoleClient("uploadDonationReceipt");
+  if (!serviceRole) {
+    return { success: false, error: UPLOAD_FAILED_MESSAGE };
+  }
   const clientIp = await getClientIp();
 
   // Límite de frecuencia: 10 por hora por IP para subida de comprobante
-  const allowed = await verifyRateLimit(
+  const rateLimit = await verifyRateLimit(
     serviceRole,
     `donation:${clientIp}`,
     10,
     3600
   );
-  if (!allowed) {
+  if (rateLimit === "error") {
+    return { success: false, error: UPLOAD_FAILED_MESSAGE };
+  }
+  if (rateLimit === "blocked") {
     return {
       success: false,
       error: getUserFacingErrorMessage(
@@ -308,7 +366,8 @@ export async function uploadDonationReceipt(
   if (!safeCompareTokens(donation.upload_token, uploadToken)) {
     return {
       success: false,
-      error: "El token de autorización no es válido para esta donación.",
+      error:
+        "No pudimos confirmar que este comprobante corresponde a tu donación. Escríbenos por la página de contacto con tu código de referencia.",
     };
   }
 
@@ -374,7 +433,7 @@ export async function uploadDonationReceipt(
     console.error("Error al subir comprobante a Storage:", uploadError);
     return {
       success: false,
-      error: "No fue posible almacenar el archivo. Por favor, intenta de nuevo.",
+      error: UPLOAD_FAILED_MESSAGE,
     };
   }
 
@@ -393,7 +452,7 @@ export async function uploadDonationReceipt(
 
     return {
       success: false,
-      error: "Ocurrió un error al registrar el comprobante. Intenta nuevamente.",
+      error: UPLOAD_FAILED_MESSAGE,
     };
   }
 
