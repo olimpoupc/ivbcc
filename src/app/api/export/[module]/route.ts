@@ -20,6 +20,8 @@ const statusLabels: Record<string, string> = {
   read: "Leído",
   responded: "Respondido",
   archived: "Archivado",
+  verified: "Verificada",
+  rejected: "Rechazada",
 };
 
 function formatDateColombia(value?: string | null) {
@@ -165,6 +167,59 @@ export async function GET(
       ["Usuario", "Curso", "Fecha"],
       rows,
       "inscripciones-cursos-ivbcc.csv"
+    );
+  }
+
+  if (moduleName === "donations" || moduleName === "donaciones") {
+    const status = searchParams.get("status") || "all";
+
+    let dataQuery = supabase
+      .from("donations")
+      .select(
+        "reference_code,first_name,last_name,email,phone,amount,method_title,status,admin_note,verified_at,created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(EXPORT_ROW_LIMIT);
+
+    if (status !== "all") dataQuery = dataQuery.eq("status", status);
+    if (query) {
+      const likeValue = quoteFilterValue(`%${query}%`);
+      dataQuery = dataQuery.or(
+        `first_name.ilike.${likeValue},last_name.ilike.${likeValue},reference_code.ilike.${likeValue},method_title.ilike.${likeValue}`
+      );
+    }
+
+    const { data, error } = await dataQuery;
+    if (error) return queryFailed(error.message);
+
+    const rows = (data || []).map((donation) => [
+      donation.reference_code,
+      `${donation.first_name} ${donation.last_name}`,
+      donation.email || "",
+      donation.phone || "",
+      donation.method_title,
+      String(donation.amount),
+      statusLabels[donation.status] || donation.status,
+      donation.admin_note || "",
+      formatDateColombia(donation.created_at),
+      donation.verified_at ? formatDateColombia(donation.verified_at) : "",
+    ]);
+
+    return buildCsvResponse(
+      [
+        "Referencia",
+        "Donante",
+        "Correo",
+        "Teléfono",
+        "Método",
+        "Monto (COP)",
+        "Estado",
+        "Nota Admin",
+        "Fecha Creación",
+        "Fecha Verificación",
+      ],
+      rows,
+      "donaciones-ivbcc.csv"
     );
   }
 

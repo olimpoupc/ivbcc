@@ -955,3 +955,153 @@ describe("8. course_certificates: nadie se emite certificados ni los lista (INSE
   });
 });
 
+describe("9. Tabla donations y bucket donation-receipts", () => {
+  let donationId: string;
+  const refCode = `DON-2026-RLS${runId.toUpperCase().slice(0, 3)}`;
+
+  beforeAll(async () => {
+    const created = await service
+      .from("donations")
+      .insert({
+        reference_code: refCode,
+        first_name: "Donante",
+        last_name: "Prueba",
+        email: "donante@test.com",
+        phone: "3001234567",
+        amount: 50000,
+        method_title: "Nequi",
+        upload_token: "token-secreto-rls",
+        data_consent: true,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+
+    donationId = mustRow(created, "sembrar donacion").id;
+    cleanup.push(async () => service.from("donations").delete().eq("id", donationId));
+
+    const fileBytes = Buffer.from([0x25, 0x50, 0x44, 0x46]);
+    const uploadRes = await service.storage
+      .from("donation-receipts")
+      .upload(`receipts/test-${runId}.pdf`, fileBytes, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+    must(uploadRes, "subir comprobante de prueba");
+    cleanup.push(async () =>
+      service.storage.from("donation-receipts").remove([`receipts/test-${runId}.pdf`])
+    );
+  });
+
+  it("BLOQUEO: anon no puede leer donations", async () => {
+    const res = await anon.from("donations").select("*").eq("id", donationId);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+  });
+
+  it("BLOQUEO: usuario normal no puede leer donations", async () => {
+    const res = await userA.client.from("donations").select("*").eq("id", donationId);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+  });
+
+  it("BLOQUEO: anon no puede insertar en donations", async () => {
+    const res = await anon.from("donations").insert({
+      reference_code: `DON-2026-ANON${runId.toUpperCase().slice(0, 2)}`,
+      first_name: "Anon",
+      last_name: "Tester",
+      amount: 10000,
+      method_title: "Nequi",
+      upload_token: "tok",
+      data_consent: true,
+    });
+    expectInsertDenied(res);
+  });
+
+  it("BLOQUEO: usuario normal no puede insertar en donations", async () => {
+    const res = await userA.client.from("donations").insert({
+      reference_code: `DON-2026-USER${runId.toUpperCase().slice(0, 2)}`,
+      first_name: "User",
+      last_name: "Tester",
+      amount: 10000,
+      method_title: "Nequi",
+      upload_token: "tok",
+      data_consent: true,
+    });
+    expectInsertDenied(res);
+  });
+
+  it("BLOQUEO: anon no puede actualizar donations", async () => {
+    const res = await anon
+      .from("donations")
+      .update({ status: "verified" })
+      .eq("id", donationId)
+      .select("id");
+    expectNoRowsAffectedOrDenied(res);
+  });
+
+  it("BLOQUEO: usuario normal no puede actualizar donations", async () => {
+    const res = await userA.client
+      .from("donations")
+      .update({ status: "verified" })
+      .eq("id", donationId)
+      .select("id");
+    expectNoRowsAffectedOrDenied(res);
+  });
+
+  it("BLOQUEO: anon no puede borrar en donations", async () => {
+    const res = await anon.from("donations").delete().eq("id", donationId).select("id");
+    expectNoRowsAffectedOrDenied(res);
+  });
+
+  it("BLOQUEO: usuario normal no puede borrar en donations", async () => {
+    const res = await userA.client.from("donations").delete().eq("id", donationId).select("id");
+    expectNoRowsAffectedOrDenied(res);
+  });
+
+  it("CONTROL: admin SI puede leer donations", async () => {
+    const res = await admin.client
+      .from("donations")
+      .select("id, reference_code, amount")
+      .eq("id", donationId);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([
+      { id: donationId, reference_code: refCode, amount: 50000 },
+    ]);
+  });
+
+  it("CONTROL: admin SI puede actualizar donations", async () => {
+    const res = await admin.client
+      .from("donations")
+      .update({ admin_note: "Nota verificada por admin" })
+      .eq("id", donationId)
+      .select("id, admin_note");
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([
+      { id: donationId, admin_note: "Nota verificada por admin" },
+    ]);
+  });
+
+  it("BLOQUEO: usuario normal no puede leer el bucket donation-receipts", async () => {
+    const res = await userA.client.storage
+      .from("donation-receipts")
+      .download(`receipts/test-${runId}.pdf`);
+    expect(res.error).not.toBeNull();
+  });
+
+  it("BLOQUEO: anon no puede leer el bucket donation-receipts", async () => {
+    const res = await anon.storage
+      .from("donation-receipts")
+      .download(`receipts/test-${runId}.pdf`);
+    expect(res.error).not.toBeNull();
+  });
+
+  it("CONTROL: admin SI puede leer objetos del bucket donation-receipts", async () => {
+    const res = await admin.client.storage
+      .from("donation-receipts")
+      .download(`receipts/test-${runId}.pdf`);
+    expect(res.error).toBeNull();
+    expect(res.data).not.toBeNull();
+  });
+});
+

@@ -15,6 +15,8 @@ import {
   type AdminListSearchParams,
 } from "@/lib/admin-query";
 
+import { DonationTabs } from "./DonationTabs";
+
 export const revalidate = 0;
 
 const donationMethodSelect =
@@ -100,6 +102,8 @@ export default async function AdminDonacionesPage({ searchParams }: Props) {
           </AdminActionButton>
         }
       />
+
+      <DonationTabs current="metodos" />
 
       <section className="grid gap-4 md:grid-cols-3">
         <AdminMetricCard
