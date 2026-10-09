@@ -20,6 +20,9 @@ export type RegisterForEventResult =
   | { success: false; error: string; alreadyRegistered?: boolean };
 
 const GENERIC_ERROR = "No pudimos registrar tu inscripción. Inténtalo nuevamente.";
+const EVENT_PASSED_ERROR =
+  "Las inscripciones para este evento ya cerraron porque el evento ya comenzó o finalizó.";
+const EVENT_CLOSED_ERROR = "Las inscripciones para este evento ya no están disponibles.";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -114,6 +117,12 @@ async function registerForEventUnsafe(
     return { success: false, error: "Las inscripciones para este evento no están disponibles." };
   }
 
+  // Misma regla que la política RLS: no se aceptan inscripciones una vez
+  // que llega la fecha y hora de inicio del evento.
+  if (new Date(event.event_date).getTime() <= Date.now()) {
+    return { success: false, error: EVENT_PASSED_ERROR };
+  }
+
   // 4. Insertar (sin .select(): los visitantes no pueden leer inscripciones)
   const { error: insertError } = await supabase.from("event_registrations").insert({
     event_id: event.id,
@@ -129,6 +138,11 @@ async function registerForEventUnsafe(
         error: "Ya estás inscrito en este evento.",
         alreadyRegistered: true,
       };
+    }
+    // 42501 = la política RLS rechazó la fila (p. ej. el evento empezó o se
+    // cerró justo entre la validación y la inserción).
+    if (insertError.code === "42501") {
+      return { success: false, error: EVENT_CLOSED_ERROR };
     }
     console.error("Error al registrar inscripción a evento:", insertError);
     // P0001 = límite por correo de la base; solo se muestran mensajes conocidos.
