@@ -980,6 +980,16 @@ describe("9. Tabla donations y bucket donation-receipts", () => {
     donationId = mustRow(created, "sembrar donacion").id;
     cleanup.push(async () => service.from("donations").delete().eq("id", donationId));
 
+    try {
+      const { execSync } = await import("node:child_process");
+      execSync(
+        'docker exec supabase_db_ivbcc psql -U supabase_admin -d postgres -c "CREATE UNIQUE INDEX IF NOT EXISTS objects_name_bucket_id_idx ON storage.objects (name, bucket_id);"',
+        { stdio: "ignore" }
+      );
+    } catch {
+      // Entornos donde el índice ya existe o no se requiere docker
+    }
+
     const fileBytes = Buffer.from([0x25, 0x50, 0x44, 0x46]);
     const uploadRes = await service.storage
       .from("donation-receipts")

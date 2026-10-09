@@ -107,16 +107,4 @@ create policy "Admins can read donation receipts"
   to authenticated
   using (bucket_id = 'donation-receipts' and public.is_admin());
 
--- Asegurar índice único en (name, bucket_id) requerido por supabase storage-api
-do $$
-begin
-  if not exists (
-    select 1 from pg_indexes where schemaname = 'storage' and tablename = 'objects' and indexname = 'objects_name_bucket_id_idx'
-  ) then
-    execute 'create unique index objects_name_bucket_id_idx on storage.objects (name, bucket_id)';
-  end if;
-exception
-  when others then
-    null;
-end $$;
 
