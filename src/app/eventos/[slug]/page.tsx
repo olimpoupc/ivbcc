@@ -61,6 +61,11 @@ export default async function EventoDetallePage({ params }: Props) {
 
   const eventoIndex = (eventos || []).findIndex((item) => item.slug === slug);
   const evento = eventoIndex >= 0 ? eventos?.[eventoIndex] : null;
+  // Misma regla que la Server Action y la política RLS: abiertas solo si
+  // están habilitadas y el evento todavía no ha comenzado.
+  const registrationOpen = Boolean(
+    evento?.registration_enabled && new Date(evento.event_date).getTime() > now.getTime()
+  );
   const previousEvent =
     eventoIndex >= 0 && eventos && eventoIndex > 0
       ? eventos[eventoIndex - 1]
@@ -132,12 +137,12 @@ export default async function EventoDetallePage({ params }: Props) {
               </span>
               <span
                 className={`badge ${
-                  evento.registration_enabled
+                  registrationOpen
                     ? "border-green-200 bg-green-50 text-green-700"
                     : "border-[#e8e2d6] bg-[#f3eee4] text-slate-600"
                 }`}
               >
-                {evento.registration_enabled
+                {registrationOpen
                   ? "Inscripciones disponibles"
                   : "Inscripciones cerradas"}
               </span>
@@ -200,7 +205,7 @@ export default async function EventoDetallePage({ params }: Props) {
           <section className="premium-surface rounded-[30px] p-8">
             <h2 className="section-title text-3xl text-gray-950">Inscripción</h2>
             <div className="mt-5">
-              {evento.registration_enabled ? (
+              {registrationOpen ? (
                 <EventRegistrationForm eventId={evento.id} />
               ) : (
                 <div className="rounded-2xl bg-[#f6f1e8] px-5 py-4 text-sm font-medium text-gray-600">

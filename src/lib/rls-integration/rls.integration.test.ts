@@ -1115,3 +1115,77 @@ describe("9. Tabla donations y bucket donation-receipts", () => {
   });
 });
 
+
+describe("Inscripciones a eventos: solo eventos publicados, abiertos y futuros", () => {
+  const ids: Record<"open" | "draft" | "closed" | "past", string> = {
+    open: "",
+    draft: "",
+    closed: "",
+    past: "",
+  };
+
+  const inOneWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  beforeAll(async () => {
+    const fixtures = {
+      open: { status: "published", registration_enabled: true, event_date: inOneWeek },
+      draft: { status: "draft", registration_enabled: true, event_date: inOneWeek },
+      closed: { status: "published", registration_enabled: false, event_date: inOneWeek },
+      past: { status: "published", registration_enabled: true, event_date: yesterday },
+    } as const;
+
+    for (const [key, fields] of Object.entries(fixtures) as Array<[keyof typeof ids, (typeof fixtures)[keyof typeof fixtures]]>) {
+      const row = mustRow(
+        await service
+          .from("events")
+          .insert({
+            title: `RLS inscripciones ${key} ${runId}`,
+            slug: `rls-${runId}-reg-${key}`,
+            description: "d",
+            ...fields,
+          })
+          .select("id")
+          .single(),
+        `evento ${key}`,
+      );
+      ids[key] = row.id;
+      cleanup.push(async () => service.from("events").delete().eq("id", row.id));
+    }
+  });
+
+  // Correo distinto en cada intento: el límite por correo (5/h) no debe influir.
+  const registration = (eventKey: keyof typeof ids, who: string) => ({
+    event_id: ids[eventKey],
+    full_name: `RLS-TEST-${runId}-${who}`,
+    email: `reg-${eventKey}-${who}-${runId}@example.test`,
+    phone: "3001234567",
+  });
+
+  it("CONTROL: anon SI puede inscribirse a un evento publicado, abierto y futuro", async () => {
+    const res = await anon.from("event_registrations").insert(registration("open", "anon"));
+    expect(res.error).toBeNull();
+  });
+
+  it("CONTROL: un usuario autenticado SI puede inscribirse a un evento abierto", async () => {
+    const res = await userA.client
+      .from("event_registrations")
+      .insert(registration("open", "user-a"));
+    expect(res.error).toBeNull();
+  });
+
+  it.each(["draft", "closed", "past"] as const)(
+    "BLOQUEO: anon no puede inscribirse a un evento %s",
+    async (eventKey) => {
+      const res = await anon.from("event_registrations").insert(registration(eventKey, "anon"));
+      expectInsertDenied(res);
+    },
+  );
+
+  it("BLOQUEO: un usuario autenticado no puede inscribirse a un evento pasado", async () => {
+    const res = await userA.client
+      .from("event_registrations")
+      .insert(registration("past", "user-a"));
+    expectInsertDenied(res);
+  });
+});

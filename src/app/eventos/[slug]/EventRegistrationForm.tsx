@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { trackEvent } from "@/lib/analytics";
 import { isClientRateLimited, sanitizeText } from "@/lib/security";
 import FormField from "@/components/ui/FormField";
+import type { CalendarLinks } from "@/lib/event-calendar";
+import { registerForEvent, type RegisterForEventResult } from "./actions";
 
 type Props = {
   eventId: string;
@@ -27,10 +28,12 @@ export default function EventRegistrationForm({ eventId }: Props) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+  const [calendarLinks, setCalendarLinks] = useState<CalendarLinks | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
+    setCalendarLinks(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(phone);
@@ -78,38 +81,43 @@ export default function EventRegistrationForm({ eventId }: Props) {
       return;
     }
 
-    const { error } = await supabase.from("event_registrations").insert({
-      event_id: eventId,
-      full_name: cleanFullName,
-      email: normalizedEmail,
-      phone: normalizedPhone || null,
-    });
+    // La inscripción y el correo de confirmación se hacen en el servidor.
+    let result: RegisterForEventResult;
+    try {
+      result = await registerForEvent({
+        eventId,
+        fullName: cleanFullName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+      });
+    } catch {
+      setIsSubmitting(false);
+      setMessageType("error");
+      setMessage("No pudimos conectarnos. Revisa tu internet e inténtalo nuevamente.");
+      return;
+    }
 
     setIsSubmitting(false);
 
-    if (error) {
+    if (!result.success) {
       setMessageType("error");
-
-      if (error.code === "23505") {
-        setMessage("Ya estás inscrito en este evento.");
-        return;
+      setMessage(result.error);
+      // Si ya estaba inscrito, lo recordamos para no repetir el intento.
+      if (result.alreadyRegistered) {
+        window.localStorage.setItem(registrationKey, "true");
       }
-
-      if (error.code === "P0001") {
-        setMessage(error.message);
-        console.error(error);
-        return;
-      }
-
-      setMessage("No pudimos registrar tu inscripción. Inténtalo nuevamente.");
-      console.error(error);
       return;
     }
 
     window.localStorage.setItem(registrationKey, "true");
     trackEvent("event_registration", { event_id: eventId });
     setMessageType("success");
-    setMessage("Inscripción registrada correctamente.");
+    setCalendarLinks(result.calendarLinks);
+    setMessage(
+      result.emailSent
+        ? `Inscripción registrada correctamente. Te enviamos la confirmación a ${normalizedEmail}.`
+        : "Inscripción registrada correctamente."
+    );
     setFullName("");
     setEmail("");
     setPhone("");
@@ -154,12 +162,32 @@ export default function EventRegistrationForm({ eventId }: Props) {
 
       {message && (
         <p
+          role={messageType === "error" ? "alert" : "status"}
           className={`form-note ${
             messageType === "success" ? "border-green-200 bg-green-50/80 text-green-800" : "border-red-200 bg-red-50/80 text-red-800"
           }`}
         >
           {message}
         </p>
+      )}
+
+      {messageType === "success" && calendarLinks && (
+        <div className="rounded-2xl border border-[#e8e2d6] bg-[#f6f1e8] p-4">
+          <p className="text-sm font-extrabold text-gray-950">Agregar a tu calendario:</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <a
+              href={calendarLinks.google}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary"
+            >
+              Google Calendar
+            </a>
+            <a href={calendarLinks.ics} className="btn-secondary">
+              Apple / Outlook Calendar
+            </a>
+          </div>
+        </div>
       )}
     </form>
   );
