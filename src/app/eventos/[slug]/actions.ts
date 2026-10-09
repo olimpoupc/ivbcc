@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { Resend } from "resend";
 import { renderEventRegistrationEmail } from "@/lib/email-templates";
+import { buildCalendarLinks, type CalendarLinks } from "@/lib/event-calendar";
 import { sanitizeText } from "@/lib/security";
 import { siteUrl } from "@/lib/seo";
 import { createSupabasePublicClient } from "@/lib/supabase-server";
@@ -16,7 +17,7 @@ export type RegisterForEventInput = {
 };
 
 export type RegisterForEventResult =
-  | { success: true; emailSent: boolean }
+  | { success: true; emailSent: boolean; calendarLinks: CalendarLinks }
   | { success: false; error: string; alreadyRegistered?: boolean };
 
 const GENERIC_ERROR = "No pudimos registrar tu inscripción. Inténtalo nuevamente.";
@@ -149,16 +150,31 @@ async function registerForEventUnsafe(
     return { success: false, error: getUserFacingErrorMessage(insertError, GENERIC_ERROR) };
   }
 
-  // 5. Correo de confirmación. Si falla, la inscripción ya quedó guardada:
+  // 5. Enlaces "Agregar al calendario": se usan en el correo y en la pantalla.
+  const eventUrl = `${siteUrl}/eventos/${encodeURIComponent(event.slug)}`;
+  const calendarLinks = buildCalendarLinks(
+    {
+      id: event.id,
+      title: event.title,
+      startsAt: event.event_date,
+      location: event.location,
+      eventUrl,
+    },
+    siteUrl
+  );
+
+  // 6. Correo de confirmación. Si falla, la inscripción ya quedó guardada:
   //    no se reporta como error al usuario, solo se registra en el servidor.
   const emailSent = await sendConfirmationEmail({
     to: email,
     recipientName: fullName,
     phone,
     event,
+    eventUrl,
+    calendarLinks,
   });
 
-  return { success: true, emailSent };
+  return { success: true, emailSent, calendarLinks };
 }
 
 async function sendConfirmationEmail({
@@ -166,11 +182,15 @@ async function sendConfirmationEmail({
   recipientName,
   phone,
   event,
+  eventUrl,
+  calendarLinks,
 }: {
   to: string;
   recipientName: string;
   phone: string;
-  event: { title: string; slug: string; event_date: string; location: string | null };
+  event: { title: string; event_date: string; location: string | null };
+  eventUrl: string;
+  calendarLinks: CalendarLinks;
 }): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EVENTS_FROM_EMAIL || process.env.CONTACT_FROM_EMAIL;
@@ -194,9 +214,10 @@ async function sendConfirmationEmail({
         eventTitle: event.title,
         eventDateLabel: formatEventDate(event.event_date),
         eventLocation: event.location,
-        eventUrl: `${siteUrl}/eventos/${encodeURIComponent(event.slug)}`,
+        eventUrl,
         email: to,
         phone,
+        calendarLinks,
       }),
     });
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { isClientRateLimited, sanitizeText } from "@/lib/security";
 import FormField from "@/components/ui/FormField";
+import type { CalendarLinks } from "@/lib/event-calendar";
 import { registerForEvent, type RegisterForEventResult } from "./actions";
 
 type Props = {
@@ -27,10 +28,12 @@ export default function EventRegistrationForm({ eventId }: Props) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+  const [calendarLinks, setCalendarLinks] = useState<CalendarLinks | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
+    setCalendarLinks(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(phone);
@@ -109,6 +112,7 @@ export default function EventRegistrationForm({ eventId }: Props) {
     window.localStorage.setItem(registrationKey, "true");
     trackEvent("event_registration", { event_id: eventId });
     setMessageType("success");
+    setCalendarLinks(result.calendarLinks);
     setMessage(
       result.emailSent
         ? `Inscripción registrada correctamente. Te enviamos la confirmación a ${normalizedEmail}.`
@@ -165,6 +169,25 @@ export default function EventRegistrationForm({ eventId }: Props) {
         >
           {message}
         </p>
+      )}
+
+      {messageType === "success" && calendarLinks && (
+        <div className="rounded-2xl border border-[#e8e2d6] bg-[#f6f1e8] p-4">
+          <p className="text-sm font-extrabold text-gray-950">Agregar a tu calendario:</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <a
+              href={calendarLinks.google}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary"
+            >
+              Google Calendar
+            </a>
+            <a href={calendarLinks.ics} className="btn-secondary">
+              Apple / Outlook Calendar
+            </a>
+          </div>
+        </div>
       )}
     </form>
   );

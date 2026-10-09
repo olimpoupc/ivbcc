@@ -59,7 +59,16 @@ export type EventRegistrationEmailData = {
   eventUrl: string;
   email: string;
   phone: string;
+  /** Enlaces "Agregar al calendario" (ver src/lib/event-calendar.ts). */
+  calendarLinks: {
+    google: string;
+    ics: string;
+  };
 };
+
+function calendarButton(href: string, label: string) {
+  return `<a href="${escapeHtml(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:10px 18px;border:1px solid #0f2a4a;border-radius:999px;color:#0f2a4a;font-size:13px;font-weight:bold;text-decoration:none;">${escapeHtml(label)}</a>`;
+}
 
 function detailRow(label: string, value: string) {
   return `<tr>
@@ -113,6 +122,10 @@ export function renderEventRegistrationEmail(data: EventRegistrationEmailData) {
                     </td>
                   </tr>
                 </table>
+                <div style="margin:0 0 24px;padding:16px;background-color:#faf7ef;border-radius:12px;">
+                  <p style="margin:0 0 12px;color:#0f2a4a;font-size:14px;font-weight:bold;">Agendar evento:</p>
+                  ${calendarButton(data.calendarLinks.google, "Google Calendar")}${calendarButton(data.calendarLinks.ics, "Apple / Outlook Calendar")}
+                </div>
                 <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
                   Si no fuiste tú quien hizo esta inscripción, puedes ignorar este correo.
                 </p>
