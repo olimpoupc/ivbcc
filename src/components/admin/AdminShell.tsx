@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { AdminIcon, type AdminIconName } from "./AdminIcons";
 
@@ -10,7 +11,15 @@ type AdminNavItem = {
   href: string;
   label: string;
   icon: AdminIconName;
+  /** Subenlaces que se muestran debajo del elemento principal. */
+  children?: AdminNavItem[];
+  /** Clave para mostrar una insignia con un contador. */
+  badgeKey?: AdminNavBadgeKey;
 };
+
+type AdminNavBadgeKey = "pendingDonations";
+
+export type AdminNavBadges = Partial<Record<AdminNavBadgeKey, number>>;
 
 type AdminNavSection = {
   label: string;
@@ -21,6 +30,8 @@ type AdminShellProps = {
   children: React.ReactNode;
   pathname: string;
   adminRole?: string;
+  /** Contadores para las insignias del menú (p. ej. donaciones pendientes). */
+  badges?: AdminNavBadges;
 };
 
 const navSections: AdminNavSection[] = [
@@ -52,7 +63,19 @@ const navSections: AdminNavSection[] = [
   {
     label: "Herramientas",
     items: [
-      { href: "/admin/donaciones", label: "Donaciones", icon: "donation" },
+      {
+        href: "/admin/donaciones",
+        label: "Donaciones",
+        icon: "donation",
+        children: [
+          {
+            href: "/admin/donaciones/registro",
+            label: "Registro de donaciones",
+            icon: "file",
+            badgeKey: "pendingDonations",
+          },
+        ],
+      },
       { href: "/admin/centro-ayuda", label: "Centro de Ayuda", icon: "spark" },
     ],
   },
@@ -71,17 +94,34 @@ function formatCurrentDate() {
   }).format(new Date());
 }
 
+// Un elemento con subenlaces solo se marca activo si no lo está uno de sus
+// hijos; así en /admin/donaciones/registro se resalta "Registro de donaciones"
+// y no "Donaciones".
+function isItemActive(pathname: string, item: AdminNavItem) {
+  if (!isActivePath(pathname, item.href)) return false;
+  return !(item.children || []).some((child) => isActivePath(pathname, child.href));
+}
+
 function getCurrentNavItem(pathname: string) {
   return navSections
-    .flatMap((section) => section.items)
+    .flatMap((section) => section.items.flatMap((item) => [...(item.children || []), item]))
     .find((item) => isActivePath(pathname, item.href));
+}
+
+function formatBadge(value: number) {
+  return value > 99 ? "99+" : String(value);
 }
 
 export default function AdminShell({
   children,
-  pathname,
+  pathname: initialPathname,
   adminRole = "Administrador",
+  badges = {},
 }: AdminShellProps) {
+  // El layout no se vuelve a renderizar al navegar entre páginas del panel,
+  // así que la ruta del servidor puede quedar desactualizada: usamos la del
+  // navegador y la del servidor solo como respaldo.
+  const pathname = usePathname() || initialPathname;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const currentItem = useMemo(() => getCurrentNavItem(pathname), [pathname]);
@@ -104,6 +144,7 @@ export default function AdminShell({
           <AdminSidebar
             pathname={pathname}
             isCollapsed={isCollapsed}
+            badges={badges}
             onNavigate={() => setIsMobileOpen(false)}
           />
         </div>
@@ -129,6 +170,7 @@ export default function AdminShell({
             <AdminSidebar
               pathname={pathname}
               isCollapsed={false}
+              badges={badges}
               onNavigate={() => setIsMobileOpen(false)}
             />
           </div>
@@ -220,10 +262,12 @@ export default function AdminShell({
 function AdminSidebar({
   pathname,
   isCollapsed,
+  badges,
   onNavigate,
 }: {
   pathname: string;
   isCollapsed: boolean;
+  badges: AdminNavBadges;
   onNavigate: () => void;
 }) {
   return (
@@ -259,34 +303,28 @@ function AdminSidebar({
               </p>
             ) : null}
             <div className="space-y-1">
-              {section.items.map((item) => {
-                const isActive = isActivePath(pathname, item.href);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    title={isCollapsed ? item.label : undefined}
-                    onClick={onNavigate}
-                    className={`group flex min-h-12 items-center gap-3 rounded-full px-3 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ivbcc-gold)] ${
-                      isActive
-                        ? "bg-white text-[var(--ivbcc-navy)] shadow-lg"
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    } ${isCollapsed ? "justify-center" : ""}`}
-                  >
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        isActive
-                          ? "bg-[var(--ivbcc-gold)] text-[var(--ivbcc-navy)]"
-                          : "bg-white/10 text-white/70 group-hover:text-white"
-                      }`}
-                    >
-                      <AdminIcon name={item.icon} className="h-4 w-4" />
-                    </span>
-                    {!isCollapsed ? <span>{item.label}</span> : null}
-                  </Link>
-                );
-              })}
+              {section.items.map((item) => (
+                <div key={item.href} className="space-y-1">
+                  <AdminNavLink
+                    item={item}
+                    isActive={isItemActive(pathname, item)}
+                    isCollapsed={isCollapsed}
+                    badges={badges}
+                    onNavigate={onNavigate}
+                  />
+                  {item.children?.map((child) => (
+                    <AdminNavLink
+                      key={child.href}
+                      item={child}
+                      isActive={isActivePath(pathname, child.href)}
+                      isCollapsed={isCollapsed}
+                      badges={badges}
+                      onNavigate={onNavigate}
+                      isSubItem
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -303,5 +341,66 @@ function AdminSidebar({
         </div>
       ) : null}
     </aside>
+  );
+}
+
+function AdminNavLink({
+  item,
+  isActive,
+  isCollapsed,
+  badges,
+  onNavigate,
+  isSubItem = false,
+}: {
+  item: AdminNavItem;
+  isActive: boolean;
+  isCollapsed: boolean;
+  badges: AdminNavBadges;
+  onNavigate: () => void;
+  isSubItem?: boolean;
+}) {
+  const badgeValue = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
+  const badgeLabel =
+    badgeValue > 0 && item.badgeKey === "pendingDonations"
+      ? `${badgeValue} ${badgeValue === 1 ? "donación pendiente" : "donaciones pendientes"}`
+      : undefined;
+
+  return (
+    <Link
+      href={item.href}
+      title={isCollapsed ? [item.label, badgeLabel].filter(Boolean).join(" · ") : undefined}
+      aria-current={isActive ? "page" : undefined}
+      onClick={onNavigate}
+      className={`group relative flex items-center gap-3 rounded-full px-3 font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ivbcc-gold)] ${
+        isSubItem ? "min-h-10 text-[0.8rem]" : "min-h-12 text-sm"
+      } ${isSubItem && !isCollapsed ? "ml-6" : ""} ${
+        isActive
+          ? "bg-white text-[var(--ivbcc-navy)] shadow-lg"
+          : "text-white/70 hover:bg-white/10 hover:text-white"
+      } ${isCollapsed ? "justify-center" : ""}`}
+    >
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full ${
+          isSubItem ? "h-7 w-7" : "h-8 w-8"
+        } ${
+          isActive
+            ? "bg-[var(--ivbcc-gold)] text-[var(--ivbcc-navy)]"
+            : "bg-white/10 text-white/70 group-hover:text-white"
+        }`}
+      >
+        <AdminIcon name={item.icon} className={isSubItem ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      </span>
+      {!isCollapsed ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
+      {badgeValue > 0 ? (
+        <span
+          aria-label={badgeLabel}
+          className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ivbcc-gold)] px-1.5 text-[0.68rem] font-black text-[var(--ivbcc-navy)] ${
+            isCollapsed ? "absolute right-1 top-0" : ""
+          }`}
+        >
+          {formatBadge(badgeValue)}
+        </span>
+      ) : null}
+    </Link>
   );
 }

@@ -136,6 +136,7 @@ export function AdminMetricCard({
   label,
   value,
   detail,
+  secondaryDetail,
   href,
   icon = "analytics",
   tone = "navy",
@@ -143,6 +144,8 @@ export function AdminMetricCard({
   label: string;
   value: React.ReactNode;
   detail?: string;
+  /** Segunda línea opcional bajo el detalle. */
+  secondaryDetail?: string;
   href?: string;
   icon?: AdminIconName;
   tone?: "navy" | "gold" | "slate";
@@ -187,6 +190,15 @@ export function AdminMetricCard({
           }`}
         >
           {detail}
+        </p>
+      ) : null}
+      {secondaryDetail ? (
+        <p
+          className={`mt-1 text-sm font-bold ${
+            tone === "slate" ? "text-[var(--ivbcc-ink)]" : "text-current/85"
+          }`}
+        >
+          {secondaryDetail}
         </p>
       ) : null}
     </div>
