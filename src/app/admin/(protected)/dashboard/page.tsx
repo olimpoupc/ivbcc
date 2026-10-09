@@ -14,6 +14,13 @@ import {
 import { AdminIcon, type AdminIconName } from "@/components/admin/AdminIcons";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { siteUrl } from "@/lib/seo";
+import { formatColombianPesos } from "@/lib/donations-format";
+import {
+  fetchInBatches,
+  monthRange,
+  rangeToUtcBounds,
+  toColombiaDate,
+} from "@/lib/donations-range";
 
 type CountResult = {
   count: number | null;
@@ -175,11 +182,82 @@ function hasError(result: { error: unknown }) {
   return Boolean(result.error);
 }
 
+// Lleva al registro filtrado por pendientes. "periodo=todo" evita que el
+// filtro por defecto ("Este año") oculte pendientes de años anteriores.
+const PENDING_DONATIONS_HREF = "/admin/donaciones/registro?status=pending&periodo=todo";
+
+type DonationSnapshot = {
+  pendingCount: number;
+  pendingTotal: number;
+  verifiedMonthCount: number;
+  verifiedMonthTotal: number;
+};
+
+type ServerSupabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+const sumAmounts = (rows: { amount: number | string }[]) =>
+  rows.reduce((total, row) => total + (Number(row.amount) || 0), 0);
+
+/**
+ * Pendientes (todas las fechas) y verificadas del mes en curso (hora de
+ * Colombia, por fecha de registro como en el registro de donaciones). Lee
+ * solo el monto con la sesión del administrador (RLS). Si algo falla
+ * devuelve null y la tarjeta muestra "Consulta no disponible".
+ */
+async function loadDonationSnapshot(supabase: ServerSupabase): Promise<DonationSnapshot | null> {
+  try {
+    const today = toColombiaDate(new Date());
+    const { gte, lt } = rangeToUtcBounds(monthRange(today.year, today.month));
+
+    const [pending, verifiedThisMonth] = await Promise.all([
+      fetchInBatches<{ amount: number | string }>((from, to) =>
+        supabase
+          .from("donations")
+          .select("amount")
+          .eq("status", "pending")
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
+      fetchInBatches<{ amount: number | string }>((from, to) =>
+        supabase
+          .from("donations")
+          .select("amount")
+          .eq("status", "verified")
+          .gte("created_at", gte as string)
+          .lt("created_at", lt as string)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      ),
+    ]);
+
+    if (pending.error || verifiedThisMonth.error) {
+      console.error(
+        "No se pudo cargar el resumen de donaciones del dashboard:",
+        pending.error || verifiedThisMonth.error
+      );
+      return null;
+    }
+
+    return {
+      pendingCount: pending.rows.length,
+      pendingTotal: sumAmounts(pending.rows),
+      verifiedMonthCount: verifiedThisMonth.rows.length,
+      verifiedMonthTotal: sumAmounts(verifiedThisMonth.rows),
+    };
+  } catch (error) {
+    console.error("No se pudo cargar el resumen de donaciones del dashboard:", error);
+    return null;
+  }
+}
+
 export default async function AdminDashboardPage() {
   const supabase = await createSupabaseServerClient();
   const headersList = await headers();
   const today = new Date();
   const nowIso = today.toISOString();
+  const donationSnapshotPromise = loadDonationSnapshot(supabase);
 
   const [
     newsPublished,
@@ -304,6 +382,7 @@ export default async function AdminDashboardPage() {
       .eq("is_active", true),
   ]);
 
+  const donationSnapshot = await donationSnapshotPromise;
   const count = (result: CountResult) => (result.error ? 0 : result.count || 0);
   const rows = <T,>(result: DataResult<T>) => (result.error ? [] : result.data || []);
 
@@ -564,6 +643,23 @@ export default async function AdminDashboardPage() {
             tone={metric.tone as "navy" | "gold" | "slate"}
           />
         ))}
+        <AdminMetricCard
+          href={PENDING_DONATIONS_HREF}
+          label="Donaciones pendientes"
+          value={donationSnapshot ? formatNumber(donationSnapshot.pendingCount) : "—"}
+          detail={
+            donationSnapshot
+              ? `Valor pendiente: ${formatColombianPesos(donationSnapshot.pendingTotal)}`
+              : "Consulta no disponible"
+          }
+          secondaryDetail={
+            donationSnapshot
+              ? `Verificadas este mes: ${formatColombianPesos(donationSnapshot.verifiedMonthTotal)}`
+              : undefined
+          }
+          icon="donation"
+          tone="gold"
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_380px]">

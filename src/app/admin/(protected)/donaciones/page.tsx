@@ -81,6 +81,7 @@ export default async function AdminDonacionesPage({ searchParams }: Props) {
           subtitle="No fue posible cargar los métodos de donación."
           icon="donation"
         />
+        <DonationTabs current="metodos" />
       </AdminPageShell>
     );
   }

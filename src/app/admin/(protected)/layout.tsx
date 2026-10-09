@@ -33,10 +33,28 @@ export default async function ProtectedAdminLayout({
     redirect("/");
   }
 
+  // Insignia del menú: solo cuenta (head: true, sin traer filas) con la sesión
+  // del administrador y RLS. Si falla, simplemente no se muestra.
+  let pendingDonations = 0;
+  try {
+    const { count, error } = await supabase
+      .from("donations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    if (error) {
+      console.error("No se pudo contar las donaciones pendientes:", error);
+    } else {
+      pendingDonations = count || 0;
+    }
+  } catch (error) {
+    console.error("No se pudo contar las donaciones pendientes:", error);
+  }
+
   return (
     <AdminShell
       pathname={pathname}
       adminRole="Administrador"
+      badges={{ pendingDonations }}
     >
       {children}
     </AdminShell>
