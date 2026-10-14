@@ -1,47 +1,21 @@
 "use client";
 
-type Registration = {
-  full_name: string;
-  email: string;
-  phone?: string | null;
-  created_at?: string | null;
-};
+import { CSV_BOM } from "@/lib/csv";
+import {
+  buildRegistrationsCsvContent,
+  type RegistrationCsvRow,
+} from "@/lib/registrations-csv";
 
 type Props = {
-  registrations: Registration[];
+  registrations: RegistrationCsvRow[];
 };
-
-function formatDateTimeColombia(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Bogota",
-  }).format(new Date(value));
-}
-
-function escapeCsvValue(value: string) {
-  const normalizedValue = value.replace(/"/g, '""');
-  return `"${normalizedValue}"`;
-}
 
 export default function DownloadRegistrationsCsvButton({
   registrations,
 }: Props) {
   function handleDownload() {
-    const header = "Nombre;Correo;Telefono;Fecha";
-    const rows = registrations.map((registration) =>
-      [
-        escapeCsvValue(registration.full_name),
-        escapeCsvValue(registration.email),
-        escapeCsvValue(registration.phone || ""),
-        escapeCsvValue(formatDateTimeColombia(registration.created_at)),
-      ].join(";")
-    );
-
-    const csvContent = ["sep=;", header, ...rows].join("\n");
-    const blob = new Blob([`\uFEFF${csvContent}`], {
+    const csvContent = buildRegistrationsCsvContent(registrations);
+    const blob = new Blob([`${CSV_BOM}${csvContent}`], {
       type: "text/csv;charset=utf-8;",
     });
     const url = URL.createObjectURL(blob);
