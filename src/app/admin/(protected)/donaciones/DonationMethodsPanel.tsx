@@ -12,7 +12,7 @@ import {
   AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
 import { buildListHref } from "@/lib/admin-query";
-import { validateImageFile } from "@/lib/security";
+import { validateImageFile, uploadHints } from "@/lib/security";
 import {
   deleteDonationMethod,
   saveDonationMethod,
@@ -529,7 +529,7 @@ export default function DonationMethodsPanel({
           </Field>
         </div>
 
-        <Field label="Subir QR">
+        <Field label="Subir QR" help={uploadHints.image}>
           <input
             ref={qrInputRef}
             type="file"

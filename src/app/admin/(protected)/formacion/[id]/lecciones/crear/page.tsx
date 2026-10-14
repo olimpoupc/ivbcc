@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   buildSafeStoragePath,
   validateDocumentFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminPageHeader,
@@ -214,7 +215,7 @@ export default function CrearLeccionPage() {
         </AdminPanelCard>
 
         <AdminPanelCard className="space-y-5">
-        <AdminFormField label="Material PDF" hint="Solo se permite PDF.">
+        <AdminFormField label="Material PDF" hint={uploadHints.pdf}>
           <input
             type="file"
             accept="application/pdf"

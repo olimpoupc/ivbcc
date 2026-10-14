@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import {
   buildSafeStoragePath,
   validateDocumentFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminPageHeader,
@@ -261,7 +262,7 @@ export default function EditarLeccionPage() {
           )}
         </AdminFormField>
 
-        <AdminFormField label="Reemplazar material PDF" hint="Solo se permite PDF.">
+        <AdminFormField label="Reemplazar material PDF" hint={uploadHints.pdf}>
           <input
             type="file"
             accept="application/pdf"

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { buildSafeStoragePath, validateImageFile } from "@/lib/security";
+import { buildSafeStoragePath, validateImageFile, uploadHints } from "@/lib/security";
 import {
   AdminPageHeader,
   AdminPageShell,
@@ -202,7 +202,7 @@ export default function CrearCursoPage() {
         </AdminPanelCard>
 
         <AdminPanelCard className="space-y-5">
-        <AdminFormField label="Imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
+        <AdminFormField label="Imagen" hint={uploadHints.image}>
           <input
             ref={imageInputRef}
             type="file"

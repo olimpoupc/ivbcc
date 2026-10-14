@@ -20,6 +20,19 @@ export const uploadLimits = {
   logoMaxBytes: 2 * 1024 * 1024,
 };
 
+export function formatUploadLimit(maxBytes: number) {
+  return `máx. ${Math.round(maxBytes / 1024 / 1024)} MB`;
+}
+
+// Textos de ayuda de los campos de subida del panel, derivados de
+// uploadLimits para que el límite mostrado nunca se desfase del validado.
+export const uploadHints = {
+  image: `Formatos permitidos: JPG, PNG o WebP (${formatUploadLimit(uploadLimits.imageMaxBytes)}).`,
+  logo: `Formatos permitidos: JPG, PNG o WebP (${formatUploadLimit(uploadLimits.logoMaxBytes)}).`,
+  pdf: `Solo se permite PDF (${formatUploadLimit(uploadLimits.documentMaxBytes)}).`,
+  document: `PDF, DOC o DOCX (${formatUploadLimit(uploadLimits.documentMaxBytes)}).`,
+};
+
 export function sanitizeText(value: string, maxLength = 5000) {
   return value
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
