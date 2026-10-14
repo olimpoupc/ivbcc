@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { saveQuiz } from "./actions";
+import { QUIZ_PASSING_PERCENTAGE } from "@/lib/course-progress";
+import { validateQuizDraft } from "@/lib/quiz-validation";
 import { AdminPanelCard } from "@/components/admin/AdminPrimitives";
 import {
   AdminFormField,
@@ -65,6 +67,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<QuizStatus>("draft");
   const [lessonId, setLessonId] = useState("");
@@ -285,46 +288,18 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
     );
   }
 
-  function validateQuiz() {
-    if (!title.trim()) {
-      alert("El quiz debe tener un título.");
-      return false;
-    }
-
-    if (questions.length === 0) {
-      alert("Debes agregar al menos una pregunta.");
-      return false;
-    }
-
-    for (const question of questions) {
-      if (!question.questionText.trim()) {
-        alert("Todas las preguntas deben tener texto.");
-        return false;
-      }
-
-      if (question.options.length < 2) {
-        alert("Cada pregunta debe tener al menos dos opciones.");
-        return false;
-      }
-
-      if (question.options.some((option) => !option.optionText.trim())) {
-        alert("Todas las opciones deben tener texto.");
-        return false;
-      }
-
-      if (!question.options.some((option) => option.isCorrect)) {
-        alert("Cada pregunta debe tener una respuesta correcta.");
-        return false;
-      }
-    }
-
-    return true;
-  }
+  // Validación en línea: mismas reglas que save_quiz en la base de datos.
+  // Los errores se muestran desde el primer intento de guardar y se
+  // actualizan mientras el administrador corrige.
+  const validation = validateQuizDraft(title, questions);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!validateQuiz()) return;
+    if (!validation.isValid) {
+      setShowValidation(true);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -361,13 +336,23 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
     return <AdminPanelCard>Cargando quiz...</AdminPanelCard>;
   }
 
+  const fieldError = (message: string | null | undefined) =>
+    showValidation && message ? (
+      <p role="alert" className="mt-2 text-xs font-bold text-red-700">
+        {message}
+      </p>
+    ) : null;
+
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-6"
     >
       <AdminPanelCard className="space-y-5">
-      <AdminFormField label="Título del quiz">
+      <AdminFormField
+        label="Título del quiz"
+        hint="Lo verán los estudiantes. Ejemplo: «Quiz lección 1: Fundamentos de la fe»."
+      >
         <input
           type="text"
           value={title}
@@ -375,10 +360,14 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
           required
           className={adminInputClass}
         />
+        {fieldError(validation.titleError)}
       </AdminFormField>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <AdminFormField label="Estado">
+        <AdminFormField
+          label="Estado"
+          hint="Borrador: solo se ve en el panel. Publicado: los estudiantes inscritos pueden responderlo."
+        >
           <div className="grid gap-3 md:grid-cols-2">
             <label>
               <AdminRadioCard checked={status === "draft"}>
@@ -408,7 +397,10 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
           </div>
         </AdminFormField>
 
-        <AdminFormField label="Lección asociada">
+        <AdminFormField
+          label="Lección asociada"
+          hint={`Con una lección, aprobar este quiz (${QUIZ_PASSING_PERCENTAGE} % o más) completa esa lección y desbloquea la siguiente. «Quiz general del curso» es el quiz final que se exige para el certificado.`}
+        >
           <select
             value={lessonId}
             onChange={(event) => setLessonId(event.target.value)}
@@ -427,7 +419,13 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="section-title text-2xl text-[var(--ivbcc-ink)]">Preguntas</h2>
+          <div>
+            <h2 className="section-title text-2xl text-[var(--ivbcc-ink)]">Preguntas</h2>
+            <p className="mt-1 text-xs font-semibold text-[var(--ivbcc-muted)]">
+              Cada pregunta necesita al menos 2 opciones y una sola respuesta correcta.
+              Se aprueba con {QUIZ_PASSING_PERCENTAGE} % de respuestas correctas.
+            </p>
+          </div>
           <button
             type="button"
             onClick={addQuestion}
@@ -437,10 +435,21 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
           </button>
         </div>
 
+        {showValidation &&
+          validation.generalErrors.map((message) => (
+            <p key={message} role="alert" className="text-sm font-bold text-red-700">
+              {message}
+            </p>
+          ))}
+
         {questions.map((question, questionIndex) => (
           <article
             key={question.localId}
-            className="premium-surface space-y-4 rounded-[24px] p-5"
+            className={`premium-surface space-y-4 rounded-[24px] p-5 ${
+              showValidation && validation.questionErrors[question.localId]
+                ? "ring-2 ring-red-300"
+                : ""
+            }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="section-title text-lg text-[var(--ivbcc-ink)]">
@@ -471,6 +480,7 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                   }
                   required
                   rows={3}
+                  placeholder="Ejemplo: ¿Qué significa la palabra «evangelio»?"
                   className={adminTextareaClass}
                 />
               </div>
@@ -497,7 +507,12 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">Opciones</p>
+                <div>
+                  <p className="text-sm font-extrabold text-[var(--ivbcc-ink)]">Opciones</p>
+                  <p className="text-xs font-semibold text-[var(--ivbcc-muted)]">
+                    Marca «Respuesta correcta» en una opción. «Orden» define cómo se muestran.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => addOption(question.localId)}
@@ -581,9 +596,25 @@ export default function QuizEditorForm({ courseId, mode, quizId }: Props) {
                 </div>
               ))}
             </div>
+
+            {showValidation && validation.questionErrors[question.localId] && (
+              <ul role="alert" className="list-disc space-y-1 rounded-2xl border border-red-200 bg-red-50 p-4 pl-8 text-xs font-bold text-red-700">
+                {validation.questionErrors[question.localId].map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
           </article>
         ))}
       </section>
+
+      {showValidation && !validation.isValid && (
+        <p role="alert" className="text-right text-sm font-bold text-red-700">
+          {validation.errorCount === 1
+            ? "Falta corregir 1 punto marcado en rojo antes de guardar."
+            : `Faltan corregir ${validation.errorCount} puntos marcados en rojo antes de guardar.`}
+        </p>
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         <button
