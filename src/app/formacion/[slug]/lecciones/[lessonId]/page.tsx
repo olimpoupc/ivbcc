@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { buildDirectDownloadUrl } from "@/lib/storage";
 import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import {
   QUIZ_PASSING_PERCENTAGE,
@@ -216,6 +217,12 @@ export default async function LeccionDetallePage({ params }: Props) {
     };
   }
 
+  // Descarga directa si el material está en Supabase Storage; los enlaces
+  // externos (p. ej. Google Drive) siguen abriéndose en otra pestaña.
+  const materialDownload = lesson.material_url
+    ? buildDirectDownloadUrl(lesson.material_url)
+    : null;
+
   return (
     <main className="premium-page py-12">
       <section className="site-shell max-w-4xl">
@@ -263,12 +270,13 @@ export default async function LeccionDetallePage({ params }: Props) {
             </p>
           )}
 
-          {lesson.material_url && (
+          {materialDownload && (
             <div>
               <TrackedLink
-                href={lesson.material_url}
-                target="_blank"
-                rel="noreferrer"
+                href={materialDownload.href}
+                {...(materialDownload.isDirect
+                  ? { download: true }
+                  : { target: "_blank", rel: "noreferrer" })}
                 eventName="download_resource"
                 eventParams={{
                   type: "lesson_material",

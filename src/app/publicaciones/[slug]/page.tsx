@@ -7,6 +7,7 @@ import {
   seoConfig,
 } from "@/lib/seo";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { buildDirectDownloadUrl } from "@/lib/storage";
 import YouTubeEmbed from "@/components/media/YouTubeEmbed";
 import SharePublicationButtons from "./SharePublicationButtons";
 
@@ -149,6 +150,11 @@ export default async function PublicacionDetallePage({ params }: Props) {
     return <main className="p-10">Publicación no encontrada.</main>;
   }
 
+  // Descarga directa si el archivo está en Supabase Storage; los enlaces
+  // externos siguen abriéndose en otra pestaña.
+  const fileDownload = publication.file_url
+    ? buildDirectDownloadUrl(publication.file_url)
+    : null;
   const previousPublication =
     currentIndex < sortedPublications.length - 1
       ? sortedPublications[currentIndex + 1]
@@ -272,7 +278,7 @@ export default async function PublicacionDetallePage({ params }: Props) {
                 </div>
               )}
 
-              {publication.file_url && (
+              {fileDownload && (
                 <div className="mt-6 rounded-[24px] border border-amber-100 bg-amber-50/80 p-6">
                   <p className="text-base font-semibold text-gray-900">
                     Recurso disponible para descarga
@@ -282,9 +288,10 @@ export default async function PublicacionDetallePage({ params }: Props) {
                     tarde.
                   </p>
                   <TrackedLink
-                    href={publication.file_url}
-                    target="_blank"
-                    rel="noreferrer"
+                    href={fileDownload.href}
+                    {...(fileDownload.isDirect
+                      ? { download: true }
+                      : { target: "_blank", rel: "noreferrer" })}
                     eventName="download_resource"
                     eventParams={{
                       type: "publication",
