@@ -248,3 +248,51 @@ export function renderEventBroadcastEmail(data: EventBroadcastEmailData) {
     footer
   );
 }
+
+export type CourseWelcomeEmailData = {
+  recipientName: string;
+  courseTitle: string;
+  courseUrl: string;
+  myCoursesUrl: string;
+};
+
+/** Bienvenida al inscribirse a un curso de formación. */
+export function renderCourseWelcomeEmail(data: CourseWelcomeEmailData) {
+  return emailLayout(
+    "¡Bienvenido al curso!",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 16px;">
+                  Te inscribiste al curso <strong>${escapeHtml(data.courseTitle)}</strong>. Avanza lección por lección a tu ritmo; al aprobar los quizzes podrás obtener tu certificado.
+                </p>
+                ${primaryButton(data.myCoursesUrl, "Ir a Mis cursos")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  También puedes abrir el curso directamente: <a href="${escapeHtml(data.courseUrl)}" style="color:#0f2a4a;">${escapeHtml(data.courseUrl)}</a>
+                </p>`
+  );
+}
+
+export type CourseCompletedEmailData = {
+  recipientName: string;
+  courseTitle: string;
+  certificateCode: string;
+  verificationUrl: string;
+};
+
+/** Aprobación del curso con el código y el enlace público del certificado. */
+export function renderCourseCompletedEmail(data: CourseCompletedEmailData) {
+  return emailLayout(
+    "¡Felicitaciones, aprobaste el curso!",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">
+                  Completaste el curso <strong>${escapeHtml(data.courseTitle)}</strong> y ya tienes tu certificado.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${detailRow("Curso", data.courseTitle)}
+                  ${detailRow("Código", data.certificateCode)}
+                </table>
+                ${primaryButton(data.verificationUrl, "Ver mi certificado")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  Desde esa página puedes imprimirlo o guardarlo en PDF, y cualquier persona puede verificarlo con el código.
+                </p>`
+  );
+}

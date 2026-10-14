@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderEventRegistrationEmail } from "./email-templates";
+import {
+  renderCourseCompletedEmail,
+  renderCourseWelcomeEmail,
+  renderEventRegistrationEmail,
+} from "./email-templates";
 
 const baseData = {
   recipientName: "Ana Pérez",
@@ -54,5 +58,34 @@ describe("renderEventRegistrationEmail", () => {
     });
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+  });
+});
+
+describe("correos de cursos", () => {
+  it("bienvenida: escapa el nombre y el curso, y enlaza a Mis cursos", () => {
+    const html = renderCourseWelcomeEmail({
+      recipientName: '<img src=x onerror="alert(1)">',
+      courseTitle: "Fe & <b>Obras</b>",
+      courseUrl: "https://ivbcc.org/formacion/fe",
+      myCoursesUrl: "https://ivbcc.org/mis-cursos",
+    });
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(html).toContain("Fe &amp; &lt;b&gt;Obras&lt;/b&gt;");
+    expect(html).toContain('href="https://ivbcc.org/mis-cursos"');
+  });
+
+  it("aprobación: escapa nombre y curso, e incluye código y enlace de verificación", () => {
+    const html = renderCourseCompletedEmail({
+      recipientName: "Ana <script>",
+      courseTitle: 'Curso "Básico"',
+      certificateCode: "IVBCC-2026-ABC123",
+      verificationUrl: "https://ivbcc.org/certificados/verificar/IVBCC-2026-ABC123",
+    });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("Ana &lt;script&gt;");
+    expect(html).toContain("Curso &quot;Básico&quot;");
+    expect(html).toContain("IVBCC-2026-ABC123");
+    expect(html).toContain('href="https://ivbcc.org/certificados/verificar/IVBCC-2026-ABC123"');
   });
 });

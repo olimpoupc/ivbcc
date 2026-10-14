@@ -12,7 +12,10 @@ import {
   toCertificateViewModel,
   type CourseCertificateRecord,
   type CertificateViewModel,
+  buildCertificateVerificationUrl,
 } from "@/lib/certificates";
+import { renderCourseCompletedEmail } from "@/lib/email-templates";
+import { sendEmail } from "@/lib/mailer";
 
 type CertificateActionResult =
   | { ok: true; certificate: CertificateViewModel }
@@ -233,6 +236,27 @@ export async function getOrCreateCourseCertificate(
 
       if (!insertError && certificate) {
         revalidatePath(`/formacion/${course.slug}`);
+
+        // Solo aquí, cuando el certificado se CREA por primera vez, se envía
+        // el correo de aprobación. Las ramas de certificado existente y de
+        // conflicto 23505 no lo envían, así que abrir el certificado otra vez
+        // no reenvía nada. Si el correo falla, el certificado se conserva.
+        if (user.email) {
+          await sendEmail(
+            {
+              to: user.email,
+              subject: `¡Aprobaste el curso ${course.title}!`,
+              html: renderCourseCompletedEmail({
+                recipientName: firstName,
+                courseTitle: course.title,
+                certificateCode: certificate.code,
+                verificationUrl: buildCertificateVerificationUrl(certificate.code),
+              }),
+            },
+            "certificado de curso"
+          );
+        }
+
         return {
           ok: true,
           certificate: toCertificateViewModel(
