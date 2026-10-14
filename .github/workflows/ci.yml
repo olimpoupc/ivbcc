@@ -30,15 +30,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-  # Optional and non-blocking: the RLS integration tests need Docker plus the
-  # Supabase local stack, so they live in their own job (`npm test` and the
-  # `check` job above never touch Docker). They use the public demo keys of the
-  # local stack (see src/lib/rls-integration/helpers.ts); no secrets involved.
+  # Blocking: a PR that weakens an RLS policy must fail CI. The RLS integration
+  # tests need Docker plus the Supabase local stack, so they live in their own
+  # job (`npm test` and the `check` job above never touch Docker). They use the
+  # public demo keys of the local stack (see src/lib/rls-integration/helpers.ts);
+  # no secrets involved.
   rls:
     name: rls (Supabase local)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

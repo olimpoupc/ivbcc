@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStoragePathFromPublicUrl } from "./storage";
+import { buildDirectDownloadUrl, getStoragePathFromPublicUrl } from "./storage";
 
 describe("getStoragePathFromPublicUrl", () => {
   it("extracts the storage path from a public Supabase URL", () => {
@@ -34,5 +34,31 @@ describe("getStoragePathFromPublicUrl", () => {
     expect(getStoragePathFromPublicUrl(null)).toBeNull();
     expect(getStoragePathFromPublicUrl(undefined)).toBeNull();
     expect(getStoragePathFromPublicUrl("not-a-url")).toBeNull();
+  });
+});
+
+describe("buildDirectDownloadUrl", () => {
+  const base = "https://project.supabase.co/storage/v1/object/public/news-images";
+
+  it("añade ?download con el nombre limpio para archivos de Supabase Storage", () => {
+    const { href, isDirect } = buildDirectDownloadUrl(
+      `${base}/lessons/1760000000000-11111111-2222-3333-4444-555555555555-guia-semana-1.pdf`
+    );
+    expect(isDirect).toBe(true);
+    expect(new URL(href).searchParams.get("download")).toBe("guia-semana-1.pdf");
+  });
+
+  it("usa el nombre indicado cuando se pasa uno", () => {
+    const { href } = buildDirectDownloadUrl(`${base}/publications/doc.pdf`, "Boletín octubre.pdf");
+    expect(new URL(href).searchParams.get("download")).toBe("Boletín octubre.pdf");
+  });
+
+  it("no toca los enlaces externos (p. ej. Google Drive)", () => {
+    const url = "https://drive.google.com/file/d/abc/view";
+    expect(buildDirectDownloadUrl(url)).toEqual({ href: url, isDirect: false });
+  });
+
+  it("devuelve la URL tal cual si no es válida", () => {
+    expect(buildDirectDownloadUrl("no es una url")).toEqual({ href: "no es una url", isDirect: false });
   });
 });

@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   buildSafeStoragePath,
   validateImageFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminPageHeader,
@@ -229,7 +230,7 @@ export default function CrearNoticiaPage() {
         <AdminPanelCard className="space-y-5">
         <AdminFormField
           label="Imagen"
-          hint="Formatos permitidos: JPG, PNG o WebP."
+          hint={uploadHints.image}
         >
           <input
             ref={imageInputRef}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import TrackedNextLink from "@/components/analytics/TrackedNextLink";
 import type { PublicSiteSettings } from "@/lib/site-settings";
 
 export default function Footer({
@@ -20,6 +21,19 @@ export default function Footer({
           <p className="mt-5 text-sm leading-7 text-white/68">
             {siteSettings.footer_text}
           </p>
+          <div className="mt-6 rounded-2xl border border-white/12 bg-white/8 p-4">
+            <p className="text-sm font-semibold text-white/80">
+              Tu ofrenda sostiene esta obra.
+            </p>
+            <TrackedNextLink
+              href="/donaciones"
+              eventName="click_donate"
+              eventParams={{ location: "footer" }}
+              className="btn-primary mt-3 w-full px-6 text-base font-black"
+            >
+              <span aria-hidden="true">♥</span> Donar
+            </TrackedNextLink>
+          </div>
         </div>
 
         <div>

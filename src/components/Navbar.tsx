@@ -376,10 +376,13 @@ export default function Navbar({
           <div className="flex items-center gap-3">
             <Link
               href="/donaciones"
-              onClick={closeDropdowns}
-              className="rounded-full bg-[var(--ivbcc-gold)] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:opacity-90"
+              onClick={() => {
+                closeDropdowns();
+                trackEvent("click_donate", { location: "navbar" });
+              }}
+              className="btn-primary px-6 text-base font-black shadow-lg ring-2 ring-[var(--ivbcc-gold-2)]/60"
             >
-              $ Donar
+              <span aria-hidden="true">♥</span> Donar
             </Link>
             <Link
               href="/en-vivo"

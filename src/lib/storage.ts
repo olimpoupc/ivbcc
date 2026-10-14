@@ -34,3 +34,37 @@ export async function removeStorageObjects(
 
   return supabase.storage.from(bucket).remove(paths);
 }
+
+const PUBLIC_OBJECT_MARKER = "/storage/v1/object/public/";
+// buildSafeStoragePath (src/lib/security.ts) antepone "<timestamp>-<uuid>-".
+const SAFE_PATH_PREFIX =
+  /^\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i;
+
+/**
+ * URL de descarga directa para un archivo público de Supabase Storage: añade
+ * `?download=<nombre>`, con lo que Storage responde con
+ * `Content-Disposition: attachment` y el navegador descarga el archivo en vez
+ * de abrirlo en otra pestaña. El atributo `download` de <a> no sirve aquí
+ * porque el archivo está en otro dominio.
+ *
+ * Devuelve `isDirect: false` (y la URL sin cambios) para enlaces externos,
+ * p. ej. Google Drive, que deben seguir abriéndose en una pestaña nueva.
+ */
+export function buildDirectDownloadUrl(
+  url: string,
+  fileName?: string
+): { href: string; isDirect: boolean } {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.pathname.includes(PUBLIC_OBJECT_MARKER)) {
+      return { href: url, isDirect: false };
+    }
+
+    const lastSegment = decodeURIComponent(parsed.pathname.split("/").pop() || "");
+    const name = fileName?.trim() || lastSegment.replace(SAFE_PATH_PREFIX, "") || "archivo";
+    parsed.searchParams.set("download", name);
+    return { href: parsed.toString(), isDirect: true };
+  } catch {
+    return { href: url, isDirect: false };
+  }
+}

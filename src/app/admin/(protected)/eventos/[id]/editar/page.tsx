@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { buildSafeStoragePath, validateImageFile } from "@/lib/security";
+import { buildSafeStoragePath, validateImageFile, uploadHints } from "@/lib/security";
 import {
   AdminActionButton,
   AdminPageHeader,
@@ -318,7 +318,7 @@ export default function EditarEventoPage() {
           </AdminFormField>
 
           <div>
-            <AdminFormField label="Nueva imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
+            <AdminFormField label="Nueva imagen" hint={uploadHints.image}>
             <input
               ref={imageInputRef}
               type="file"

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildContentMetadata, resolveSeoDescription, seoConfig } from "@/lib/seo";
 import EventCountdown from "@/components/ui/EventCountdown";
+import TrackedNextLink from "@/components/analytics/TrackedNextLink";
 import EventRegistrationForm from "./EventRegistrationForm";
 import ShareEventButtons from "./ShareEventButtons";
 
@@ -213,6 +214,23 @@ export default async function EventoDetallePage({ params }: Props) {
                 </div>
               )}
             </div>
+          </section>
+
+          <section className="premium-surface flex flex-col gap-4 rounded-[30px] p-8 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="section-title text-2xl text-gray-950">Apoya esta obra</h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                Tu donación hace posibles eventos como este.
+              </p>
+            </div>
+            <TrackedNextLink
+              href="/donaciones"
+              eventName="click_donate"
+              eventParams={{ location: "event_detail", event_slug: evento.slug }}
+              className="btn-primary w-full shrink-0 px-8 text-base font-black sm:w-auto"
+            >
+              <span aria-hidden="true">♥</span> Donar
+            </TrackedNextLink>
           </section>
 
           <section className="premium-surface grid gap-4 rounded-[28px] p-5 md:grid-cols-3">

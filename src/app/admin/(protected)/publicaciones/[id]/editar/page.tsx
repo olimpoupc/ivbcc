@@ -8,6 +8,7 @@ import {
   buildSafeStoragePath,
   validateDocumentFile,
   validateImageFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminActionButton,
@@ -457,7 +458,7 @@ export default function EditarPublicacionPage() {
           </AdminFormField>
 
           <div>
-            <AdminFormField label="Nueva imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
+            <AdminFormField label="Nueva imagen" hint={uploadHints.image}>
             <input
               ref={imageInputRef}
               type="file"
@@ -509,7 +510,7 @@ export default function EditarPublicacionPage() {
           </AdminFormField>
 
           <div>
-            <AdminFormField label="Nuevo documento / archivo" hint="PDF, DOC o DOCX.">
+            <AdminFormField label="Nuevo documento / archivo" hint={uploadHints.document}>
             <input
               ref={documentInputRef}
               type="file"

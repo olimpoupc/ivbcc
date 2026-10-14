@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   buildSafeStoragePath,
   validateImageFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminActionButton,
@@ -338,7 +339,7 @@ export default function EditarNoticiaPage() {
             )}
           </AdminFormField>
 
-          <AdminFormField label="Nueva imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
+          <AdminFormField label="Nueva imagen" hint={uploadHints.image}>
             <input
               ref={imageInputRef}
               type="file"

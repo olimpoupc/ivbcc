@@ -8,6 +8,7 @@ import {
   buildSafeStoragePath,
   validateDocumentFile,
   validateImageFile,
+  uploadHints,
 } from "@/lib/security";
 import {
   AdminPageHeader,
@@ -348,7 +349,7 @@ export default function CrearPublicacionPage() {
 
         <AdminPanelCard>
         <div className="grid gap-5 md:grid-cols-2">
-          <AdminFormField label="Imagen" hint="Formatos permitidos: JPG, PNG o WebP.">
+          <AdminFormField label="Imagen" hint={uploadHints.image}>
             <input
               ref={imageInputRef}
               type="file"
@@ -380,7 +381,7 @@ export default function CrearPublicacionPage() {
             )}
 
           <div>
-            <AdminFormField label="Documento / archivo" hint="PDF, DOC o DOCX.">
+            <AdminFormField label="Documento / archivo" hint={uploadHints.document}>
             <input
               ref={documentInputRef}
               type="file"

@@ -11,6 +11,7 @@ export type AnalyticsEventName =
   | "play_video"
   | "download_resource"
   | "event_registration"
+  | "click_donate"
   | "login"
   | "register";
 
