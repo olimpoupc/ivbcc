@@ -43,3 +43,6 @@ next-env.d.ts
 # supabase
 supabase/.branches
 supabase/.temp
+
+# logs locales de next dev/start
+next-*.log
