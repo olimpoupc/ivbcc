@@ -128,3 +128,12 @@ export function buildIcsCalendar(event: CalendarEventInput, now: Date = new Date
   // RFC 5545 exige CRLF al final de cada línea.
   return lines.map(foldIcsLine).join("\r\n") + "\r\n";
 }
+
+/** Fecha y hora de inicio legibles en hora de Colombia (correos y páginas). */
+export function formatEventDate(startsAt: string): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "America/Bogota",
+  }).format(new Date(startsAt));
+}

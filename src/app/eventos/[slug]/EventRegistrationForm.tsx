@@ -4,7 +4,6 @@ import { useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { isClientRateLimited, sanitizeText } from "@/lib/security";
 import FormField from "@/components/ui/FormField";
-import type { CalendarLinks } from "@/lib/event-calendar";
 import { registerForEvent, type RegisterForEventResult } from "./actions";
 
 type Props = {
@@ -19,6 +18,10 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "").slice(0, 10);
 }
 
+// Evita reenvíos seguidos desde este navegador (el servidor también limita
+// a un enlace cada 10 minutos por inscripción pendiente).
+const RESUBMIT_COOLDOWN_MS = 10 * 60 * 1000;
+
 export default function EventRegistrationForm({ eventId }: Props) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,12 +31,11 @@ export default function EventRegistrationForm({ eventId }: Props) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
-  const [calendarLinks, setCalendarLinks] = useState<CalendarLinks | null>(null);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
-    setCalendarLinks(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizePhone(phone);
@@ -65,9 +67,12 @@ export default function EventRegistrationForm({ eventId }: Props) {
     setIsSubmitting(true);
     const registrationKey = `event-registration:${eventId}:${normalizedEmail}`;
 
-    if (window.localStorage.getItem(registrationKey)) {
-      setMessageType("error");
-      setMessage("Ya estás inscrito en este evento.");
+    const lastRequestAt = Number(window.localStorage.getItem(registrationKey));
+    if (lastRequestAt && Date.now() - lastRequestAt < RESUBMIT_COOLDOWN_MS) {
+      setMessageType("success");
+      setMessage(
+        "Ya te enviamos el enlace hace unos minutos. Revisa tu correo, incluida la carpeta de spam."
+      );
       setIsSubmitting(false);
       return;
     }
@@ -89,6 +94,7 @@ export default function EventRegistrationForm({ eventId }: Props) {
         fullName: cleanFullName,
         email: normalizedEmail,
         phone: normalizedPhone,
+        marketingConsent,
       });
     } catch {
       setIsSubmitting(false);
@@ -102,25 +108,19 @@ export default function EventRegistrationForm({ eventId }: Props) {
     if (!result.success) {
       setMessageType("error");
       setMessage(result.error);
-      // Si ya estaba inscrito, lo recordamos para no repetir el intento.
-      if (result.alreadyRegistered) {
-        window.localStorage.setItem(registrationKey, "true");
-      }
       return;
     }
 
-    window.localStorage.setItem(registrationKey, "true");
+    // El servidor responde igual exista o no el correo: la inscripción solo
+    // cuenta cuando la persona confirma desde el enlace del correo.
+    window.localStorage.setItem(registrationKey, String(Date.now()));
     trackEvent("event_registration", { event_id: eventId });
     setMessageType("success");
-    setCalendarLinks(result.calendarLinks);
-    setMessage(
-      result.emailSent
-        ? `Inscripción registrada correctamente. Te enviamos la confirmación a ${normalizedEmail}.`
-        : "Inscripción registrada correctamente."
-    );
+    setMessage(result.message);
     setFullName("");
     setEmail("");
     setPhone("");
+    setMarketingConsent(false);
   }
 
   return (
@@ -152,12 +152,26 @@ export default function EventRegistrationForm({ eventId }: Props) {
         pattern="[0-9]{10}"
       />
 
+      <label className="flex items-start gap-3 rounded-2xl border border-[#e8e2d6] bg-[#f6f1e8]/60 p-4 text-sm leading-6 text-gray-700">
+        <input
+          type="checkbox"
+          checked={marketingConsent}
+          onChange={(e) => setMarketingConsent(e.target.checked)}
+          className="mt-1 h-5 w-5 shrink-0"
+        />
+        <span>
+          Acepto recibir comunicaciones de la IVBCC sobre este evento (opcional). Autorizo el
+          tratamiento de mis datos conforme a la Ley 1581 de 2012; puedo darme de baja en
+          cualquier momento desde el enlace de cada mensaje.
+        </span>
+      </label>
+
       <button
         type="submit"
         disabled={isSubmitting}
         className="btn-primary w-full py-4 text-base font-black disabled:opacity-60"
       >
-        {isSubmitting ? "Inscribiendo..." : "Inscribirme"}
+        {isSubmitting ? "Enviando..." : "Inscribirme"}
       </button>
 
       {message && (
@@ -171,24 +185,6 @@ export default function EventRegistrationForm({ eventId }: Props) {
         </p>
       )}
 
-      {messageType === "success" && calendarLinks && (
-        <div className="rounded-2xl border border-[#e8e2d6] bg-[#f6f1e8] p-4">
-          <p className="text-sm font-extrabold text-gray-950">Agregar a tu calendario:</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <a
-              href={calendarLinks.google}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary"
-            >
-              Google Calendar
-            </a>
-            <a href={calendarLinks.ics} className="btn-secondary">
-              Apple / Outlook Calendar
-            </a>
-          </div>
-        </div>
-      )}
     </form>
   );
 }

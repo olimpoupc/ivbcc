@@ -1,33 +1,46 @@
 "use server";
 
 import { headers } from "next/headers";
-import { Resend } from "resend";
-import { renderEventRegistrationEmail } from "@/lib/email-templates";
-import { buildCalendarLinks, type CalendarLinks } from "@/lib/event-calendar";
+import { renderEventConfirmationRequestEmail } from "@/lib/email-templates";
+import { formatEventDate } from "@/lib/event-calendar";
+import { sendEmail } from "@/lib/mailer";
+import { generateToken, getConfirmationExpiry } from "@/lib/registration-token";
 import { sanitizeText } from "@/lib/security";
 import { siteUrl } from "@/lib/seo";
-import { createSupabasePublicClient } from "@/lib/supabase-server";
-import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase-server";
 
 export type RegisterForEventInput = {
   eventId: string;
   fullName: string;
   email: string;
   phone: string;
+  marketingConsent: boolean;
 };
 
 export type RegisterForEventResult =
-  | { success: true; emailSent: boolean; calendarLinks: CalendarLinks }
-  | { success: false; error: string; alreadyRegistered?: boolean };
+  | { success: true; message: string }
+  | { success: false; error: string };
+
+/**
+ * Respuesta ÚNICA para toda solicitud válida, exista o no el correo, esté
+ * pendiente o ya confirmado: así el formulario no revela quién está inscrito.
+ */
+const REGISTRATION_ACCEPTED_MESSAGE =
+  "Revisa tu correo para confirmar tu inscripción. El enlace vence en 48 horas.";
 
 const GENERIC_ERROR = "No pudimos registrar tu inscripción. Inténtalo nuevamente.";
 const EVENT_PASSED_ERROR =
   "Las inscripciones para este evento ya cerraron porque el evento ya comenzó o finalizó.";
-const EVENT_CLOSED_ERROR = "Las inscripciones para este evento ya no están disponibles.";
+const EVENT_CLOSED_ERROR = "Las inscripciones para este evento no están disponibles.";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Un reenvío del enlace por inscripción pendiente cada 10 minutos. */
+const RESEND_COOLDOWN_SECONDS = 600;
+
+type ServiceRoleClient = ReturnType<typeof createSupabaseServiceRoleClient>;
 
 async function getClientIp(): Promise<string> {
   const headerList = await headers();
@@ -39,12 +52,22 @@ async function getClientIp(): Promise<string> {
   return headerList.get("x-real-ip")?.trim() || "127.0.0.1";
 }
 
-function formatEventDate(value: string) {
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "full",
-    timeStyle: "short",
-    timeZone: "America/Bogota",
-  }).format(new Date(value));
+async function rateLimitAllows(
+  supabase: ServiceRoleClient,
+  key: string,
+  limit: number,
+  windowSeconds: number
+): Promise<boolean | null> {
+  const { data, error } = await supabase.rpc("check_rate_limit", {
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error("Error al verificar límite de inscripciones:", error);
+    return null;
+  }
+  return Boolean(data);
 }
 
 export async function registerForEvent(
@@ -66,6 +89,7 @@ async function registerForEventUnsafe(
   const fullName = sanitizeText(String(input?.fullName || ""), 120);
   const email = sanitizeText(String(input?.email || ""), 254).toLowerCase();
   const phone = String(input?.phone || "").replace(/\D/g, "");
+  const marketingConsent = input?.marketingConsent === true;
 
   if (!UUID_PATTERN.test(eventId)) {
     return { success: false, error: "El evento no es válido." };
@@ -80,21 +104,13 @@ async function registerForEventUnsafe(
     return { success: false, error: "El teléfono debe tener exactamente 10 dígitos." };
   }
 
-  // Cliente anónimo: la inserción sigue sujeta a RLS, sin service_role.
-  const supabase = createSupabasePublicClient();
+  // El INSERT público se cierra en la migración 2: solo el servidor inscribe.
+  const supabase = createSupabaseServiceRoleClient();
 
-  // 2. Límite por IP (además del límite por correo que aplica la base de
-  //    datos). Evita que se use el formulario para enviar correos masivos.
+  // 2. Límite por IP (además del límite por correo del disparador de la BD).
   const ip = await getClientIp();
-  const { data: allowed, error: rateLimitError } = await supabase.rpc("check_rate_limit", {
-    p_key: `event_registration_ip:${ip}`,
-    p_limit: 10,
-    p_window_seconds: 3600,
-  });
-  if (rateLimitError) {
-    console.error("Error al verificar límite de inscripciones:", rateLimitError);
-    return { success: false, error: GENERIC_ERROR };
-  }
+  const allowed = await rateLimitAllows(supabase, `event_registration_ip:${ip}`, 10, 3600);
+  if (allowed === null) return { success: false, error: GENERIC_ERROR };
   if (!allowed) {
     return {
       success: false,
@@ -102,11 +118,11 @@ async function registerForEventUnsafe(
     };
   }
 
-  // 3. El evento debe existir, estar publicado y con inscripciones abiertas.
-  //    También nos da los datos reales para el correo (no se confía en el cliente).
+  // 3. Evento publicado, con inscripciones abiertas y futuro (service_role no
+  //    pasa por RLS, así que estas reglas se comprueban aquí).
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id,title,slug,event_date,location,status,registration_enabled")
+    .select("id,title,event_date,location,status,registration_enabled")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -115,119 +131,103 @@ async function registerForEventUnsafe(
     return { success: false, error: GENERIC_ERROR };
   }
   if (!event || event.status !== "published" || !event.registration_enabled) {
-    return { success: false, error: "Las inscripciones para este evento no están disponibles." };
+    return { success: false, error: EVENT_CLOSED_ERROR };
   }
-
-  // Misma regla que la política RLS: no se aceptan inscripciones una vez
-  // que llega la fecha y hora de inicio del evento.
   if (new Date(event.event_date).getTime() <= Date.now()) {
     return { success: false, error: EVENT_PASSED_ERROR };
   }
 
-  // 4. Insertar (sin .select(): los visitantes no pueden leer inscripciones)
-  const { error: insertError } = await supabase.from("event_registrations").insert({
-    event_id: event.id,
-    full_name: fullName,
-    email,
-    phone,
-  });
+  // 4. ¿Ya existe una inscripción con este correo para el evento?
+  const { data: existing, error: existingError } = await supabase
+    .from("event_registrations")
+    .select("id,status")
+    .eq("event_id", event.id)
+    .eq("email", email)
+    .maybeSingle();
 
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return {
-        success: false,
-        error: "Ya estás inscrito en este evento.",
-        alreadyRegistered: true,
-      };
-    }
-    // 42501 = la política RLS rechazó la fila (p. ej. el evento empezó o se
-    // cerró justo entre la validación y la inserción).
-    if (insertError.code === "42501") {
-      return { success: false, error: EVENT_CLOSED_ERROR };
-    }
-    console.error("Error al registrar inscripción a evento:", insertError);
-    // P0001 = límite por correo de la base; solo se muestran mensajes conocidos.
-    return { success: false, error: getUserFacingErrorMessage(insertError, GENERIC_ERROR) };
+  if (existingError) {
+    console.error("Error al buscar inscripción existente:", existingError);
+    return { success: false, error: GENERIC_ERROR };
   }
 
-  // 5. Enlaces "Agregar al calendario": se usan en el correo y en la pantalla.
-  const eventUrl = `${siteUrl}/eventos/${encodeURIComponent(event.slug)}`;
-  const calendarLinks = buildCalendarLinks(
-    {
-      id: event.id,
-      title: event.title,
-      startsAt: event.event_date,
-      location: event.location,
-      eventUrl,
-    },
-    siteUrl
-  );
+  // Confirmada: no se reenvía nada (evita usar el formulario para enviar
+  // correos a terceros) y se responde igual que siempre.
+  if (existing?.status === "confirmed") {
+    return { success: true, message: REGISTRATION_ACCEPTED_MESSAGE };
+  }
 
-  // 6. Correo de confirmación. Si falla, la inscripción ya quedó guardada:
-  //    no se reporta como error al usuario, solo se registra en el servidor.
-  const emailSent = await sendConfirmationEmail({
-    to: email,
-    recipientName: fullName,
-    phone,
-    event,
-    eventUrl,
-    calendarLinks,
-  });
+  const { token, hash } = generateToken();
+  const expiresAt = getConfirmationExpiry().toISOString();
+  const consentFields = marketingConsent
+    ? { marketing_consent: true, consent_at: new Date().toISOString() }
+    : {};
 
-  return { success: true, emailSent, calendarLinks };
-}
-
-async function sendConfirmationEmail({
-  to,
-  recipientName,
-  phone,
-  event,
-  eventUrl,
-  calendarLinks,
-}: {
-  to: string;
-  recipientName: string;
-  phone: string;
-  event: { title: string; event_date: string; location: string | null };
-  eventUrl: string;
-  calendarLinks: CalendarLinks;
-}): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EVENTS_FROM_EMAIL || process.env.CONTACT_FROM_EMAIL;
-
-  if (!apiKey || !from) {
-    console.error(
-      "[eventos] No se envió el correo de confirmación: falta RESEND_API_KEY o EVENTS_FROM_EMAIL/CONTACT_FROM_EMAIL."
+  if (existing) {
+    // Pendiente (o cancelada): nuevo enlace, como máximo uno cada 10 minutos.
+    const canResend = await rateLimitAllows(
+      supabase,
+      `event_confirmation_resend:${existing.id}`,
+      1,
+      RESEND_COOLDOWN_SECONDS
     );
-    return false;
+    if (!canResend) return { success: true, message: REGISTRATION_ACCEPTED_MESSAGE };
+
+    const { error: updateError } = await supabase
+      .from("event_registrations")
+      .update({
+        status: "pending",
+        confirmation_token_hash: hash,
+        confirmation_expires_at: expiresAt,
+        ...consentFields,
+      })
+      .eq("id", existing.id)
+      .neq("status", "confirmed");
+
+    if (updateError) {
+      console.error("Error al renovar el enlace de confirmación:", updateError);
+      return { success: false, error: GENERIC_ERROR };
+    }
+  } else {
+    const { error: insertError } = await supabase.from("event_registrations").insert({
+      event_id: event.id,
+      full_name: fullName,
+      email,
+      phone,
+      status: "pending",
+      confirmation_token_hash: hash,
+      confirmation_expires_at: expiresAt,
+      marketing_consent: marketingConsent,
+      consent_at: marketingConsent ? new Date().toISOString() : null,
+    });
+
+    if (insertError) {
+      // 23505: otra solicitud simultánea creó la fila; P0001: límite por
+      // correo del disparador. En ambos casos se responde igual, sin revelar
+      // nada sobre el correo, y no se envía otro enlace.
+      if (insertError.code === "23505" || insertError.code === "P0001") {
+        return { success: true, message: REGISTRATION_ACCEPTED_MESSAGE };
+      }
+      console.error("Error al registrar inscripción a evento:", insertError);
+      return { success: false, error: GENERIC_ERROR };
+    }
   }
 
-  try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from,
-      to,
-      replyTo: process.env.CONTACT_REPLY_TO_EMAIL || undefined,
-      subject: `Inscripción confirmada: ${event.title}`,
-      html: renderEventRegistrationEmail({
-        recipientName,
+  // 5. Correo con el enlace de confirmación. Si falla, la solicitud queda
+  //    pendiente y la persona puede volver a enviarla para recibir otro enlace.
+  await sendEmail(
+    {
+      to: email,
+      subject: `Confirma tu inscripción: ${event.title}`,
+      html: renderEventConfirmationRequestEmail({
+        recipientName: fullName,
         eventTitle: event.title,
         eventDateLabel: formatEventDate(event.event_date),
         eventLocation: event.location,
-        eventUrl,
-        email: to,
-        phone,
-        calendarLinks,
+        confirmUrl: `${siteUrl}/eventos/confirmar?token=${encodeURIComponent(token)}`,
       }),
-    });
+    },
+    "confirmación de inscripción a evento"
+  );
 
-    if (error) {
-      console.error("Resend rechazó el correo de confirmación de evento:", error);
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error("Error al enviar el correo de confirmación de evento:", error);
-    return false;
-  }
+  return { success: true, message: REGISTRATION_ACCEPTED_MESSAGE };
 }

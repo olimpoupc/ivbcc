@@ -139,3 +139,85 @@ export function renderEventRegistrationEmail(data: EventRegistrationEmailData) {
   </body>
 </html>`;
 }
+
+// ---------------------------------------------------------------------------
+// Estructura común de los correos nuevos (mismo estilo que los anteriores).
+// `title` y `bodyHtml` deben llegar ya escapados.
+// ---------------------------------------------------------------------------
+
+function primaryButton(href: string, label: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td style="background-color:#c9a24a;border-radius:999px;">
+                      <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 24px;color:#0f2a4a;font-size:14px;font-weight:bold;text-decoration:none;">
+                        ${escapeHtml(label)}
+                      </a>
+                    </td>
+                  </tr>
+                </table>`;
+}
+
+function emailLayout(title: string, bodyHtml: string, footerHtml = "") {
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background-color:#f6f0dc;font-family:Georgia,'Times New Roman',serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f0dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#0f2a4a;padding:24px 32px;">
+                <p style="margin:0;color:#f6f0dc;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">
+                  Iglesia Valle de Bendición Cruzada Cristiana
+                </p>
+                <p style="margin:12px 0 0;color:#ffffff;font-size:24px;font-weight:bold;line-height:1.3;">
+                  ${title}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
+                ${bodyHtml}
+                <p style="margin:24px 0 0;">Bendiciones,<br />IVBCC</p>
+              </td>
+            </tr>
+            ${footerHtml}
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+export type EventConfirmationRequestEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  eventDateLabel: string;
+  eventLocation: string | null;
+  confirmUrl: string;
+};
+
+/** Correo con el enlace para confirmar la inscripción (vence en 48 h). */
+export function renderEventConfirmationRequestEmail(data: EventConfirmationRequestEmailData) {
+  const details = [
+    detailRow("Evento", data.eventTitle),
+    detailRow("Fecha", data.eventDateLabel),
+    data.eventLocation ? detailRow("Lugar", data.eventLocation) : "",
+  ].join("");
+
+  return emailLayout(
+    "Confirma tu inscripción",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">
+                  Recibimos tu solicitud de inscripción. Para completarla, confirma que este correo es tuyo:
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${details}
+                </table>
+                ${primaryButton(data.confirmUrl, "Confirmar inscripción")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  El enlace vence en 48 horas. Si no fuiste tú quien hizo esta inscripción, ignora este correo: sin confirmar, no quedarás inscrito.
+                </p>`
+  );
+}
