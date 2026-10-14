@@ -4,6 +4,7 @@ import { quoteFilterValue } from "@/lib/admin-query";
 import { buildCsvResponse } from "@/lib/csv";
 import { getDonationFilterParts, parseDonationStatus } from "@/lib/donations-query";
 import { getRegistrationStatusLabel } from "@/lib/registration-status";
+import { getEventRegistrationFilterParts, isUuid, parseExportStatus } from "@/lib/admin-registrations";
 import { isValidIsoDate } from "@/lib/donations-range";
 
 const EXPORT_ROW_LIMIT = 20000;
@@ -112,15 +113,26 @@ export async function GET(
   }
 
   if (moduleName === "inscripciones-eventos") {
+    // Mismos filtros que el panel. Sin "estado" se exportan solo los
+    // confirmados, como antes; "all" exporta todos los estados.
+    const evento = searchParams.get("evento");
+    const filters = getEventRegistrationFilterParts({
+      eventId: isUuid(evento) ? evento : null,
+      status: parseExportStatus(searchParams.get("estado")),
+      query: "",
+    });
+
     let dataQuery = supabase
       .from("admin_event_registrations_view")
       .select("full_name,email,phone,event_title,created_at,status,checked_in_at")
-      .eq("status", "confirmed")
       .order("created_at", { ascending: false })
       .limit(EXPORT_ROW_LIMIT);
 
+    if (filters.eventId) dataQuery = dataQuery.eq("event_id", filters.eventId);
+    if (filters.status) dataQuery = dataQuery.eq("status", filters.status);
+    if (filters.attendedOnly) dataQuery = dataQuery.not("checked_in_at", "is", null);
     if (query) {
-      const likeValue = quoteFilterValue(`%${query}%`);
+      const likeValue = quoteFilterValue(`%${query.slice(0, 100)}%`);
       dataQuery = dataQuery.or(
         `full_name.ilike.${likeValue},email.ilike.${likeValue},event_title.ilike.${likeValue}`
       );
