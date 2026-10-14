@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { buildSafeStoragePath, validateImageFile, uploadHints } from "@/lib/security";
+import { diffEventChanges, summarizeEventChanges, type EventSnapshot } from "@/lib/event-change";
+import { notifyEventChange } from "../../actions";
 import {
   AdminActionButton,
   AdminPageHeader,
@@ -83,6 +85,11 @@ export default function EditarEventoPage() {
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  // Valores con los que se cargó el evento, para detectar cambios que haya
+  // que avisar a los inscritos.
+  const [originalSnapshot, setOriginalSnapshot] = useState<EventSnapshot | null>(null);
+  const [notifyAttendees, setNotifyAttendees] = useState(true);
+  const [isNotifying, setIsNotifying] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imagePreviewUrlRef = useRef<string | null>(null);
@@ -115,6 +122,11 @@ export default function EditarEventoPage() {
       setLocation(event.location || "");
       setStatus(event.status || "draft");
       setRegistrationEnabled(Boolean(event.registration_enabled));
+      setOriginalSnapshot({
+        event_date: event.event_date || null,
+        location: event.location || null,
+        status: event.status || null,
+      });
       setIsLoading(false);
     }
 
@@ -176,6 +188,14 @@ export default function EditarEventoPage() {
     }
   }
 
+  const detectedChanges = originalSnapshot
+    ? diffEventChanges(originalSnapshot, {
+        event_date: toISOStringFromLocal(eventDate),
+        location,
+        status,
+      })
+    : [];
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -223,15 +243,30 @@ export default function EditarEventoPage() {
       })
       .eq("id", evento.id);
 
-    setIsSubmitting(false);
-
     if (error) {
+      setIsSubmitting(false);
       alert("Error al actualizar el evento");
       console.error(error);
       return;
     }
 
-    alert("Evento actualizado correctamente");
+    // Aviso a los inscritos confirmados solo si hubo cambios relevantes y la
+    // casilla está marcada. El botón sigue deshabilitado hasta terminar.
+    let notice = "";
+    if (originalSnapshot && detectedChanges.length > 0 && notifyAttendees) {
+      setIsNotifying(true);
+      try {
+        const result = await notifyEventChange(evento.id, originalSnapshot);
+        notice = result.success ? `\n\n${result.message}` : `\n\n${result.error}`;
+      } catch {
+        notice = "\n\nNo hubo conexión para enviar el aviso a los inscritos.";
+      } finally {
+        setIsNotifying(false);
+      }
+    }
+
+    setIsSubmitting(false);
+    alert(`Evento actualizado correctamente.${notice}`);
     router.push("/admin/eventos");
     router.refresh();
   }
@@ -434,6 +469,29 @@ export default function EditarEventoPage() {
         </label>
         </AdminPanelCard>
 
+        {detectedChanges.length > 0 && (
+          <AdminPanelCard className="space-y-3 border-amber-200 bg-amber-50/60">
+            <p className="text-sm font-extrabold text-amber-900">
+              Se detectaron cambios: {summarizeEventChanges(detectedChanges)}
+            </p>
+            <label className="flex items-start gap-3 text-sm font-semibold text-[var(--ivbcc-ink)]">
+              <input
+                type="checkbox"
+                checked={notifyAttendees}
+                onChange={(e) => setNotifyAttendees(e.target.checked)}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                Avisar por correo a los inscritos confirmados
+                <span className="block text-xs font-medium text-[var(--ivbcc-muted)]">
+                  Se envía al guardar. Usa el mismo tope diario de correos que los mensajes a
+                  inscritos; si no alcanza, no se envía nada y se te avisa.
+                </span>
+              </span>
+            </label>
+          </AdminPanelCard>
+        )}
+
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
@@ -448,7 +506,7 @@ export default function EditarEventoPage() {
             disabled={isSubmitting}
             className={adminPrimaryButtonClass}
           >
-            {isSubmitting ? "Guardando..." : "Guardar cambios"}
+            {isNotifying ? "Enviando avisos..." : isSubmitting ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
       </form>

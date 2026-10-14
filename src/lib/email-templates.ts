@@ -72,7 +72,7 @@ function calendarButton(href: string, label: string) {
 
 function detailRow(label: string, value: string) {
   return `<tr>
-                    <td style="padding:8px 0;color:#6b7280;font-size:13px;width:110px;vertical-align:top;">${escapeHtml(label)}</td>
+                    <td style="padding:8px 16px 8px 0;color:#6b7280;font-size:13px;width:110px;min-width:110px;vertical-align:top;">${escapeHtml(label)}</td>
                     <td style="padding:8px 0;color:#0f2a4a;font-size:15px;font-weight:bold;">${escapeHtml(value)}</td>
                   </tr>`;
 }
@@ -293,6 +293,61 @@ export function renderCourseCompletedEmail(data: CourseCompletedEmailData) {
                 ${primaryButton(data.verificationUrl, "Ver mi certificado")}
                 <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
                   Desde esa página puedes imprimirlo o guardarlo en PDF, y cualquier persona puede verificarlo con el código.
+                </p>`
+  );
+}
+
+export type EventChangeEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  /** Cambios ya formateados (Fecha, Lugar, Estado): anterior -> nuevo. */
+  changes: { label: string; from: string; to: string }[];
+  cancelled: boolean;
+  eventUrl: string;
+  /** Enlaces de calendario con los datos NUEVOS; null si el evento se canceló. */
+  calendarLinks: { google: string; ics: string } | null;
+  eventsUrl: string;
+};
+
+/** Aviso de servicio: cambio de fecha, lugar o cancelación de un evento. */
+export function renderEventChangeEmail(data: EventChangeEmailData) {
+  const rows = data.changes
+    .map(
+      (change) => `<tr>
+                    <td style="padding:8px 16px 8px 0;color:#6b7280;font-size:13px;width:110px;min-width:110px;vertical-align:top;">${escapeHtml(change.label)}</td>
+                    <td style="padding:8px 0;font-size:15px;line-height:1.5;">
+                      <span style="color:#6b7280;text-decoration:line-through;">${escapeHtml(change.from)}</span><br />
+                      <strong style="color:#0f2a4a;">${escapeHtml(change.to)}</strong>
+                    </td>
+                  </tr>`
+    )
+    .join("");
+
+  const intro = data.cancelled
+    ? `Lamentamos informarte que el evento <strong>${escapeHtml(data.eventTitle)}</strong> fue cancelado.`
+    : `Hubo cambios en el evento <strong>${escapeHtml(data.eventTitle)}</strong>. Estos son los datos actualizados:`;
+
+  const actions = data.cancelled
+    ? primaryButton(data.eventsUrl, "Ver otros eventos")
+    : `${primaryButton(data.eventUrl, "Ver el evento")}${
+        data.calendarLinks
+          ? `<div style="margin:0 0 24px;padding:16px;background-color:#faf7ef;border-radius:12px;">
+                  <p style="margin:0 0 12px;color:#0f2a4a;font-size:14px;font-weight:bold;">Agendar evento (datos actualizados):</p>
+                  ${calendarButton(data.calendarLinks.google, "Google Calendar")}${calendarButton(data.calendarLinks.ics, "Apple / Outlook Calendar")}
+                </div>`
+          : ""
+      }`;
+
+  return emailLayout(
+    data.cancelled ? "Evento cancelado" : "Cambio en el evento",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">${intro}</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${rows}
+                </table>
+                ${actions}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  Recibes este aviso porque estás inscrito y confirmaste tu inscripción a este evento. Es un mensaje de servicio sobre tu inscripción.
                 </p>`
   );
 }
