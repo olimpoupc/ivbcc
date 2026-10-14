@@ -1189,3 +1189,77 @@ describe("Inscripciones a eventos: solo eventos publicados, abiertos y futuros",
     expectInsertDenied(res);
   });
 });
+
+describe("Noticias: el público solo lee publicadas y no vencidas (R3)", () => {
+  const ids = {} as Record<
+    "published" | "expired" | "draft" | "scheduledFuture" | "scheduledPast",
+    string
+  >;
+
+  beforeAll(async () => {
+    const hour = 60 * 60 * 1000;
+    const fixtures = {
+      published: { status: "published", published_at: new Date(Date.now() - hour).toISOString() },
+      expired: {
+        status: "published",
+        published_at: new Date(Date.now() - 48 * hour).toISOString(),
+        expires_at: new Date(Date.now() - hour).toISOString(),
+      },
+      draft: { status: "draft" },
+      scheduledFuture: { status: "scheduled", published_at: new Date(Date.now() + 24 * hour).toISOString() },
+      scheduledPast: { status: "scheduled", published_at: new Date(Date.now() - hour).toISOString() },
+    } as const;
+
+    for (const [key, fields] of Object.entries(fixtures) as Array<[keyof typeof ids, Record<string, string>]>) {
+      const row = mustRow(
+        await service
+          .from("news")
+          .insert({
+            title: `RLS noticia ${key} ${runId}`,
+            slug: `rls-${runId}-news-${key}`,
+            summary: "s",
+            content: "c",
+            ...fields,
+          })
+          .select("id")
+          .single(),
+        `noticia ${key}`,
+      );
+      ids[key] = row.id;
+      cleanup.push(async () => service.from("news").delete().eq("id", row.id));
+    }
+  });
+
+  const visibleKeys = async (client: typeof anon) => {
+    const res = await client.from("news").select("id").in("id", Object.values(ids));
+    expect(res.error).toBeNull();
+    const found = new Set((res.data || []).map((row) => row.id as string));
+    return (Object.keys(ids) as Array<keyof typeof ids>).filter((key) => found.has(ids[key])).sort();
+  };
+
+  it("anon ve solo la publicada y la programada cuya hora ya llegó", async () => {
+    expect(await visibleKeys(anon)).toEqual(["published", "scheduledPast"]);
+  });
+
+  it("BLOQUEO: anon no puede leer un borrador por su id", async () => {
+    const res = await anon.from("news").select("id").eq("id", ids.draft);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+  });
+
+  it("BLOQUEO: anon no puede leer una noticia vencida ni una programada a futuro", async () => {
+    const res = await anon.from("news").select("id").in("id", [ids.expired, ids.scheduledFuture]);
+    expect(res.error).toBeNull();
+    expect(res.data).toEqual([]);
+  });
+
+  it("un usuario autenticado no-admin tiene la misma visibilidad que anon", async () => {
+    expect(await visibleKeys(userA.client)).toEqual(["published", "scheduledPast"]);
+  });
+
+  it("CONTROL: un admin SI lee todas las noticias, incluidos borradores y vencidas", async () => {
+    expect(await visibleKeys(admin.client)).toEqual(
+      ["draft", "expired", "published", "scheduledFuture", "scheduledPast"].sort(),
+    );
+  });
+});
