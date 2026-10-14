@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { trackEvent } from "@/lib/analytics";
+import { maskEmail } from "@/lib/mask-email";
 import { isClientRateLimited, sanitizeText } from "@/lib/security";
 import FormField from "@/components/ui/FormField";
-import { registerForEvent, type RegisterForEventResult } from "./actions";
+import {
+  registerForEvent,
+  type RegisterForEventInput,
+  type RegisterForEventResult,
+} from "./actions";
 
 type Props = {
   eventId: string;
 };
+
+type DoneInfo = { maskedEmail: string; at: string };
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -18,9 +25,43 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "").slice(0, 10);
 }
 
-// Evita reenvíos seguidos desde este navegador (el servidor también limita
-// a un enlace cada 10 minutos por inscripción pendiente).
-const RESUBMIT_COOLDOWN_MS = 10 * 60 * 1000;
+// En localStorage (por evento) se guarda SOLO el correo enmascarado y la
+// fecha: nunca el correo completo ni el token.
+const storageKey = (eventId: string) => `ivbcc:inscripcion-evento:${eventId}`;
+
+function readDoneSnapshot(eventId: string): string | null {
+  try {
+    return window.localStorage.getItem(storageKey(eventId));
+  } catch {
+    return null;
+  }
+}
+
+function parseDoneInfo(raw: string | null): DoneInfo | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<DoneInfo>;
+    return typeof value.maskedEmail === "string" && typeof value.at === "string"
+      ? { maskedEmail: value.maskedEmail, at: value.at }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDoneInfo(eventId: string, info: DoneInfo) {
+  try {
+    window.localStorage.setItem(storageKey(eventId), JSON.stringify(info));
+  } catch {
+    // Sin almacenamiento disponible: el bloque se muestra igual en esta visita.
+  }
+}
+
+const subscribeToNothing = () => () => {};
+const getServerSnapshot = () => null;
+
+const RATE_LIMIT_MESSAGE = "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.";
+const NETWORK_ERROR_MESSAGE = "No pudimos conectarnos. Revisa tu internet e inténtalo nuevamente.";
 
 export default function EventRegistrationForm({ eventId }: Props) {
   const [fullName, setFullName] = useState("");
@@ -32,6 +73,30 @@ export default function EventRegistrationForm({ eventId }: Props) {
     "success"
   );
   const [marketingConsent, setMarketingConsent] = useState(false);
+
+  // Estado "ya te inscribiste": en memoria y en localStorage (por evento).
+  const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  // Datos de la última solicitud, SOLO en memoria, para "Reenviar correo".
+  const [lastInput, setLastInput] = useState<RegisterForEventInput | null>(null);
+  const [isResending, setIsResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  const storedRaw = useSyncExternalStore(
+    subscribeToNothing,
+    () => readDoneSnapshot(eventId),
+    getServerSnapshot
+  );
+  const storedInfo = useMemo(() => parseDoneInfo(storedRaw), [storedRaw]);
+  const done = doneInfo ?? storedInfo;
+
+  async function submitRegistration(input: RegisterForEventInput): Promise<RegisterForEventResult> {
+    try {
+      return await registerForEvent(input);
+    } catch {
+      return { success: false, error: NETWORK_ERROR_MESSAGE };
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,20 +125,7 @@ export default function EventRegistrationForm({ eventId }: Props) {
 
     if (isClientRateLimited(`event-registration:${eventId}`, 5, 60 * 60 * 1000)) {
       setMessageType("error");
-      setMessage("Demasiados intentos. Espera unos minutos e inténtalo de nuevo.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    const registrationKey = `event-registration:${eventId}:${normalizedEmail}`;
-
-    const lastRequestAt = Number(window.localStorage.getItem(registrationKey));
-    if (lastRequestAt && Date.now() - lastRequestAt < RESUBMIT_COOLDOWN_MS) {
-      setMessageType("success");
-      setMessage(
-        "Ya te enviamos el enlace hace unos minutos. Revisa tu correo, incluida la carpeta de spam."
-      );
-      setIsSubmitting(false);
+      setMessage(RATE_LIMIT_MESSAGE);
       return;
     }
 
@@ -82,27 +134,20 @@ export default function EventRegistrationForm({ eventId }: Props) {
     if (!cleanFullName) {
       setMessageType("error");
       setMessage("Ingresa tu nombre completo.");
-      setIsSubmitting(false);
       return;
     }
 
     // La inscripción y el correo de confirmación se hacen en el servidor.
-    let result: RegisterForEventResult;
-    try {
-      result = await registerForEvent({
-        eventId,
-        fullName: cleanFullName,
-        email: normalizedEmail,
-        phone: normalizedPhone,
-        marketingConsent,
-      });
-    } catch {
-      setIsSubmitting(false);
-      setMessageType("error");
-      setMessage("No pudimos conectarnos. Revisa tu internet e inténtalo nuevamente.");
-      return;
-    }
+    const input: RegisterForEventInput = {
+      eventId,
+      fullName: cleanFullName,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      marketingConsent,
+    };
 
+    setIsSubmitting(true);
+    const result = await submitRegistration(input);
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -113,14 +158,80 @@ export default function EventRegistrationForm({ eventId }: Props) {
 
     // El servidor responde igual exista o no el correo: la inscripción solo
     // cuenta cuando la persona confirma desde el enlace del correo.
-    window.localStorage.setItem(registrationKey, String(Date.now()));
+    const info = { maskedEmail: maskEmail(normalizedEmail), at: new Date().toISOString() };
+    saveDoneInfo(eventId, info);
+    setDoneInfo(info);
+    setLastInput(input);
+    setShowForm(false);
+    setResendMessage("");
     trackEvent("event_registration", { event_id: eventId });
-    setMessageType("success");
-    setMessage(result.message);
     setFullName("");
     setEmail("");
     setPhone("");
     setMarketingConsent(false);
+  }
+
+  async function handleResend() {
+    setResendMessage("");
+
+    // Tras recargar la página no se conserva el correo completo (solo el
+    // enmascarado), así que se pide escribir los datos otra vez.
+    if (!lastInput) {
+      setShowForm(true);
+      setMessageType("success");
+      setMessage("Para reenviar el enlace, escribe de nuevo tus datos y envía el formulario.");
+      return;
+    }
+
+    if (isClientRateLimited(`event-registration:${eventId}`, 5, 60 * 60 * 1000)) {
+      setResendMessage(RATE_LIMIT_MESSAGE);
+      return;
+    }
+
+    // Usa el reenvío con espera del servidor: misma respuesta uniforme.
+    setIsResending(true);
+    const result = await submitRegistration(lastInput);
+    setIsResending(false);
+    setResendMessage(result.success ? result.message : result.error);
+  }
+
+  function handleRegisterAnother() {
+    setShowForm(true);
+    setMessage("");
+    setResendMessage("");
+  }
+
+  if (done && !showForm) {
+    return (
+      <div
+        role="status"
+        className="space-y-4 rounded-2xl border border-green-200 bg-green-50/80 p-5 text-green-900"
+      >
+        <p className="text-base font-extrabold">
+          Ya te inscribiste con {done.maskedEmail}. Revisa tu correo para confirmar.
+        </p>
+        <p className="text-sm">
+          El enlace vence en 48 horas. Si no lo encuentras, revisa la carpeta de spam.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>¿No te llegó?</span>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={isResending}
+            className="font-extrabold underline underline-offset-4 disabled:opacity-60"
+          >
+            {isResending ? "Reenviando..." : "Reenviar correo"}
+          </button>
+        </div>
+        {resendMessage && <p className="text-sm font-semibold">{resendMessage}</p>}
+
+        <button type="button" onClick={handleRegisterAnother} className="btn-secondary">
+          Inscribir a otra persona
+        </button>
+      </div>
+    );
   }
 
   return (

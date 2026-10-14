@@ -5,6 +5,8 @@ import {
   buildCourseProgressState,
   getApprovedQuizIds,
 } from "@/lib/course-progress";
+import { formatEventDate } from "@/lib/event-calendar";
+import { getSessionUpcomingEvents } from "@/lib/session-event-registrations";
 import ProfileForm from "./ProfileForm";
 
 export default async function PerfilPage() {
@@ -16,6 +18,10 @@ export default async function PerfilPage() {
   if (!user) {
     redirect("/login");
   }
+
+  // Solo lectura: eventos futuros en los que está inscrito el correo de la
+  // sesión (si está verificado).
+  const myEvents = await getSessionUpcomingEvents(user);
 
   const { data: existingProfile, error: profileError } = await supabase
     .from("profiles")
@@ -239,6 +245,54 @@ export default async function PerfilPage() {
               className="btn-ghost mt-6"
             >
               Ir a Mis Cursos
+            </Link>
+          </article>
+
+          <article className="premium-surface rounded-[30px] p-6">
+            <p className="kicker">
+              Eventos
+            </p>
+            <h2 className="section-title mt-2 text-3xl text-gray-950">
+              Mis eventos
+            </h2>
+
+            {myEvents.length ? (
+              <ul className="mt-5 space-y-3">
+                {myEvents.map((item) => (
+                  <li key={item.slug} className="rounded-2xl bg-[#f6f1e8] p-4">
+                    <Link
+                      href={`/eventos/${item.slug}`}
+                      className="font-extrabold text-[var(--ivbcc-navy)] hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <p className="mt-1 text-sm text-slate-600">{formatEventDate(item.event_date)}</p>
+                    {item.location && (
+                      <p className="text-sm text-slate-600">{item.location}</p>
+                    )}
+                    <p
+                      className={`mt-2 text-xs font-extrabold ${
+                        item.status === "confirmed" ? "text-emerald-700" : "text-amber-700"
+                      }`}
+                    >
+                      {item.status === "confirmed"
+                        ? "Inscripción confirmada"
+                        : "Pendiente de confirmar (revisa tu correo)"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted-copy mt-3 text-sm">
+                No tienes inscripciones a eventos próximos con el correo de tu cuenta.
+              </p>
+            )}
+
+            <Link
+              href="/eventos"
+              className="btn-ghost mt-6"
+            >
+              Ver eventos
             </Link>
           </article>
         </div>
