@@ -155,7 +155,7 @@ export default function EventRegistrationForm({ eventId }: Props) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="btn-primary disabled:opacity-60"
+        className="btn-primary w-full py-4 text-base font-black disabled:opacity-60"
       >
         {isSubmitting ? "Inscribiendo..." : "Inscribirme"}
       </button>
