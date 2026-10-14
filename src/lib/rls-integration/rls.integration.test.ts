@@ -1355,3 +1355,62 @@ describe("event_registrations: confirmación y asistencia", () => {
     expect(res.error?.code).toBe("23514");
   });
 });
+
+describe("Tablas de mensajes a inscritos: email_suppressions y event_broadcasts (solo admin)", () => {
+  let broadcastId: string;
+  const suppressedEmail = `baja-${runId}@example.test`;
+
+  beforeAll(async () => {
+    must(await service.from("email_suppressions").insert({ email: suppressedEmail }), "sembrar supresión");
+    cleanup.push(async () => service.from("email_suppressions").delete().eq("email", suppressedEmail));
+
+    broadcastId = mustRow(
+      await service
+        .from("event_broadcasts")
+        .insert({ event_id: eventId, subject: `RLS ${runId}`, body: "cuerpo" })
+        .select("id")
+        .single(),
+      "sembrar mensaje",
+    ).id as string;
+    cleanup.push(async () => service.from("event_broadcasts").delete().eq("id", broadcastId));
+  });
+
+  it("BLOQUEO: anon no puede leer ni insertar supresiones (no puede dar de baja a terceros)", async () => {
+    const read = await anon.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(read.data ?? []).toEqual([]);
+
+    const insert = await anon.from("email_suppressions").insert({ email: `otro-${runId}@example.test` });
+    expectInsertDenied(insert);
+  });
+
+  it("BLOQUEO: anon no puede leer, insertar ni modificar mensajes enviados", async () => {
+    const read = await anon.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(read.data ?? []).toEqual([]);
+
+    const insert = await anon
+      .from("event_broadcasts")
+      .insert({ event_id: eventId, subject: "spam", body: "spam" });
+    expectInsertDenied(insert);
+
+    const update = await anon
+      .from("event_broadcasts")
+      .update({ sent_count: 999 })
+      .eq("id", broadcastId)
+      .select();
+    expectNoRowsAffectedOrDenied(update);
+  });
+
+  it("BLOQUEO: un usuario normal no lee supresiones ni mensajes", async () => {
+    const suppressions = await userA.client.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(suppressions.data ?? []).toEqual([]);
+    const broadcasts = await userA.client.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(broadcasts.data ?? []).toEqual([]);
+  });
+
+  it("CONTROL: un admin SI lee supresiones y mensajes", async () => {
+    const suppressions = await admin.client.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(suppressions.data).toHaveLength(1);
+    const broadcasts = await admin.client.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(broadcasts.data).toHaveLength(1);
+  });
+});

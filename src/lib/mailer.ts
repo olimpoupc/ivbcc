@@ -56,3 +56,44 @@ export async function sendEmail(input: SendEmailInput, context: string): Promise
     return { ok: false, reason: "exception" };
   }
 }
+
+/**
+ * Envía hasta 100 correos en una sola llamada a la Batch Email API de Resend.
+ * Si la llamada falla, se cuenta todo el lote como fallido.
+ */
+export async function sendEmailBatch(
+  items: SendEmailInput[],
+  context: string
+): Promise<{ sent: number; failed: number }> {
+  if (!items.length) return { sent: 0, failed: 0 };
+  const config = getMailerConfig();
+  if (!config) {
+    console.error(`[correo] ${context}: lote no enviado; falta configuración de Resend.`);
+    return { sent: 0, failed: items.length };
+  }
+
+  try {
+    const resend = new Resend(config.apiKey);
+    const replyTo = process.env.CONTACT_REPLY_TO_EMAIL || undefined;
+    const { data, error } = await resend.batch.send(
+      items.map((item) => ({
+        from: config.from,
+        to: item.to,
+        replyTo,
+        subject: item.subject,
+        html: item.html,
+        headers: item.headers,
+      }))
+    );
+
+    if (error) {
+      console.error(`[correo] ${context}: Resend rechazó el lote:`, error);
+      return { sent: 0, failed: items.length };
+    }
+    const sent = Math.min(data?.data?.length ?? items.length, items.length);
+    return { sent, failed: items.length - sent };
+  } catch (error) {
+    console.error(`[correo] ${context}: error al enviar el lote:`, error);
+    return { sent: 0, failed: items.length };
+  }
+}

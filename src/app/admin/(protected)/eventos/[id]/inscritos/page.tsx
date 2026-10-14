@@ -178,6 +178,9 @@ export default async function EventoInscritosPage({ params, searchParams }: Prop
         actions={
           <>
             <DownloadRegistrationsCsvButton registrations={csvRows || []} />
+            <AdminActionButton href={`/admin/eventos/${id}/mensajes`} icon="message" tone="outline">
+              Enviar mensaje
+            </AdminActionButton>
             <AdminActionButton href="/admin/eventos" icon="arrow" tone="outline">
               Volver a eventos
             </AdminActionButton>

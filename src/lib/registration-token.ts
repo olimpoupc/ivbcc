@@ -8,7 +8,7 @@
  * comparar el secreto en claro.
  */
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 export const CONFIRMATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -39,4 +39,19 @@ export function isTokenExpired(
   if (!expiresAt) return true;
   const time = new Date(expiresAt).getTime();
   return Number.isNaN(time) || time <= now.getTime();
+}
+
+/**
+ * Token ESTABLE del enlace "Darme de baja" de una inscripción:
+ * HMAC-SHA256(EMAIL_LINK_SECRET, "unsubscribe:<id>") en base64url. Es estable
+ * para que el enlace de un mensaje anterior siga funcionando aunque se envíen
+ * más mensajes; en la base de datos solo se guarda hashToken(token).
+ */
+export function deriveUnsubscribeToken(registrationId: string, secret: string): string {
+  return createHmac("sha256", secret).update(`unsubscribe:${registrationId}`).digest("base64url");
+}
+
+export function getEmailLinkSecret(): string | null {
+  const secret = process.env.EMAIL_LINK_SECRET;
+  return secret && secret.length >= 32 ? secret : null;
 }

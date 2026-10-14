@@ -221,3 +221,30 @@ export function renderEventConfirmationRequestEmail(data: EventConfirmationReque
                 </p>`
   );
 }
+
+export type EventBroadcastEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  eventUrl: string;
+  /** Texto plano escrito por el administrador; se escapa y se pasa a párrafos. */
+  body: string;
+  unsubscribeUrl: string;
+};
+
+/** Mensaje de un administrador a los inscritos confirmados de un evento. */
+export function renderEventBroadcastEmail(data: EventBroadcastEmailData) {
+  const footer = `<tr>
+              <td style="padding:16px 32px 24px;border-top:1px solid #e8e2d6;color:#6b7280;font-size:12px;line-height:1.5;">
+                Recibes este mensaje porque te inscribiste a «${escapeHtml(data.eventTitle)}» y aceptaste recibir comunicaciones de la IVBCC sobre el evento.
+                <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:#0f2a4a;font-weight:bold;">Darme de baja</a>.
+              </td>
+            </tr>`;
+
+  return emailLayout(
+    escapeHtml(data.eventTitle),
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                ${nl2p(data.body)}
+                ${primaryButton(data.eventUrl, "Ver el evento")}`,
+    footer
+  );
+}

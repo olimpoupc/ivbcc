@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CONFIRMATION_TOKEN_TTL_MS,
+  deriveUnsubscribeToken,
   generateToken,
   getConfirmationExpiry,
   hashToken,
@@ -58,5 +59,23 @@ describe("vencimiento", () => {
   it("trata como vencido un valor vacío o inválido", () => {
     expect(isTokenExpired(null, now)).toBe(true);
     expect(isTokenExpired("no-es-fecha", now)).toBe(true);
+  });
+});
+
+describe("deriveUnsubscribeToken", () => {
+  const secret = "s".repeat(32);
+
+  it("es estable por inscripción, distinto entre inscripciones y con formato de token", () => {
+    const a1 = deriveUnsubscribeToken("11111111-1111-1111-1111-111111111111", secret);
+    const a2 = deriveUnsubscribeToken("11111111-1111-1111-1111-111111111111", secret);
+    const b = deriveUnsubscribeToken("22222222-2222-2222-2222-222222222222", secret);
+    expect(a1).toBe(a2);
+    expect(a1).not.toBe(b);
+    expect(isWellFormedToken(a1)).toBe(true);
+  });
+
+  it("cambia si cambia el secreto (no se puede adivinar sin él)", () => {
+    const id = "11111111-1111-1111-1111-111111111111";
+    expect(deriveUnsubscribeToken(id, secret)).not.toBe(deriveUnsubscribeToken(id, "t".repeat(32)));
   });
 });
