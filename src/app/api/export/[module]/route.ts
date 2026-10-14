@@ -3,6 +3,7 @@ import { getAdminUser } from "@/lib/admin-auth";
 import { quoteFilterValue } from "@/lib/admin-query";
 import { buildCsvResponse } from "@/lib/csv";
 import { getDonationFilterParts, parseDonationStatus } from "@/lib/donations-query";
+import { getRegistrationStatusLabel } from "@/lib/registration-status";
 import { isValidIsoDate } from "@/lib/donations-range";
 
 const EXPORT_ROW_LIMIT = 20000;
@@ -113,7 +114,8 @@ export async function GET(
   if (moduleName === "inscripciones-eventos") {
     let dataQuery = supabase
       .from("admin_event_registrations_view")
-      .select("full_name,email,phone,event_title,created_at")
+      .select("full_name,email,phone,event_title,created_at,status,checked_in_at")
+      .eq("status", "confirmed")
       .order("created_at", { ascending: false })
       .limit(EXPORT_ROW_LIMIT);
 
@@ -133,10 +135,14 @@ export async function GET(
       registration.phone || "",
       registration.event_title,
       formatDateColombia(registration.created_at),
+      getRegistrationStatusLabel(registration.status),
+      registration.checked_in_at
+        ? `Asistió (${formatDateColombia(registration.checked_in_at)})`
+        : "No registrada",
     ]);
 
     return buildCsvResponse(
-      ["Nombre", "Correo", "Teléfono", "Evento", "Fecha"],
+      ["Nombre", "Correo", "Teléfono", "Evento", "Fecha", "Estado", "Asistencia"],
       rows,
       "inscripciones-eventos-ivbcc.csv"
     );

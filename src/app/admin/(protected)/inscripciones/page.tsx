@@ -7,6 +7,7 @@ import {
   AdminPageShell,
   AdminPagination,
   AdminPanelCard,
+  AdminStatusBadge,
 } from "@/components/admin/AdminPrimitives";
 import {
   buildListHref,
@@ -16,6 +17,11 @@ import {
   quoteFilterValue,
   type AdminListSearchParams,
 } from "@/lib/admin-query";
+import {
+  getRegistrationStatusLabel,
+  parseRegistrationStatus,
+  registrationStatusFilters,
+} from "@/lib/registration-status";
 
 type EventRegistrationRow = {
   id: string;
@@ -25,6 +31,8 @@ type EventRegistrationRow = {
   phone: string | null;
   created_at: string;
   event_title: string;
+  status: string;
+  checked_in_at: string | null;
 };
 
 type CourseEnrollmentRow = {
@@ -62,6 +70,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
   const params = await searchParams;
   const query = getParam(params, "q")?.trim() || "";
   const type = getParam(params, "type") || "all";
+  const statusFilter = parseRegistrationStatus(getParam(params, "estado"));
   const eventsPage = getPageParam(params, "eventsPage");
   const coursesPage = getPageParam(params, "coursesPage");
   const eventsRange = getPageRange(eventsPage, PAGE_SIZE);
@@ -71,13 +80,18 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
 
   let eventsDataQuery = supabase
     .from("admin_event_registrations_view")
-    .select("id,event_id,full_name,email,phone,created_at,event_title")
+    .select("id,event_id,full_name,email,phone,created_at,event_title,status,checked_in_at")
     .order("created_at", { ascending: false })
     .range(eventsRange.from, eventsRange.to);
 
   let eventsFilteredCountQuery = supabase
     .from("admin_event_registrations_view")
     .select("*", { count: "exact", head: true });
+
+  if (statusFilter !== "all") {
+    eventsDataQuery = eventsDataQuery.eq("status", statusFilter);
+    eventsFilteredCountQuery = eventsFilteredCountQuery.eq("status", statusFilter);
+  }
 
   let coursesDataQuery = supabase
     .from("admin_course_enrollments_view")
@@ -112,7 +126,8 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
     eventsFilteredCountQuery,
     supabase
       .from("admin_event_registrations_view")
-      .select("*", { count: "exact", head: true }),
+      .select("*", { count: "exact", head: true })
+      .eq("status", "confirmed"),
     coursesDataQuery,
     coursesFilteredCountQuery,
     supabase
@@ -140,6 +155,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
     buildListHref("/admin/inscripciones", {
       q: query || undefined,
       type: type !== "all" ? type : undefined,
+      estado: statusFilter !== "all" ? statusFilter : undefined,
       eventsPage: targetPage > 1 ? String(targetPage) : undefined,
       coursesPage: coursesPage > 1 ? String(coursesPage) : undefined,
     });
@@ -148,6 +164,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
     buildListHref("/admin/inscripciones", {
       q: query || undefined,
       type: type !== "all" ? type : undefined,
+      estado: statusFilter !== "all" ? statusFilter : undefined,
       eventsPage: eventsPage > 1 ? String(eventsPage) : undefined,
       coursesPage: targetPage > 1 ? String(targetPage) : undefined,
     });
@@ -168,7 +185,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
         <AdminMetricCard
           label="Inscritos a eventos"
           value={totalEventRegistrations || 0}
-          detail="Total histórico"
+          detail="Confirmados (total histórico)"
           icon="calendar"
           tone="slate"
         />
@@ -197,6 +214,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
           </div>
 
           <input type="hidden" name="type" value={type} />
+          {statusFilter !== "all" && <input type="hidden" name="estado" value={statusFilter} />}
 
           <button
             type="submit"
@@ -211,6 +229,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
             const href = buildListHref("/admin/inscripciones", {
               q: query || undefined,
               type: filter.value !== "all" ? filter.value : undefined,
+              estado: statusFilter !== "all" ? statusFilter : undefined,
             });
             const isActive = type === filter.value;
 
@@ -239,8 +258,32 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
                 Inscripciones a eventos
               </h2>
               <p className="muted-copy mt-1 text-sm">
-                Registros públicos recibidos desde los formularios de eventos.
+                Registros públicos recibidos desde los formularios de eventos. El CSV incluye
+                solo los confirmados.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2" aria-label="Filtrar por estado">
+                {registrationStatusFilters.map((filter) => {
+                  const isActive = statusFilter === filter.value;
+                  return (
+                    <Link
+                      key={filter.value}
+                      href={buildListHref("/admin/inscripciones", {
+                        q: query || undefined,
+                        type: type !== "all" ? type : undefined,
+                        estado: filter.value !== "all" ? filter.value : undefined,
+                      })}
+                      aria-current={isActive ? "true" : undefined}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-extrabold transition ${
+                        isActive
+                          ? "border-[var(--ivbcc-gold)] bg-[var(--ivbcc-gold)] text-[var(--ivbcc-navy)]"
+                          : "border-[var(--ivbcc-line)] bg-white/70 text-[var(--ivbcc-muted)] hover:bg-white"
+                      }`}
+                    >
+                      {filter.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
             <a
               href={`/api/export/inscripciones-eventos${query ? `?q=${encodeURIComponent(query)}` : ""}`}
@@ -258,6 +301,7 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
                   <th className="pb-3 pr-4">Correo</th>
                   <th className="pb-3 pr-4">Teléfono</th>
                   <th className="pb-3 pr-4">Evento</th>
+                  <th className="pb-3 pr-4">Estado</th>
                   <th className="pb-3">Fecha de inscripción</th>
                 </tr>
               </thead>
@@ -270,6 +314,22 @@ export default async function AdminInscripcionesPage({ searchParams }: Props) {
                     <td className="py-4 pr-4">{registration.email}</td>
                     <td className="py-4 pr-4">{registration.phone || "Sin teléfono"}</td>
                     <td className="py-4 pr-4">{registration.event_title}</td>
+                    <td className="py-4 pr-4">
+                      <AdminStatusBadge
+                        tone={
+                          registration.status === "confirmed"
+                            ? "green"
+                            : registration.status === "cancelled"
+                              ? "red"
+                              : "amber"
+                        }
+                      >
+                        {getRegistrationStatusLabel(registration.status)}
+                      </AdminStatusBadge>
+                      {registration.checked_in_at && (
+                        <span className="mt-1 block text-xs font-bold text-emerald-700">Asistió</span>
+                      )}
+                    </td>
                     <td className="py-4">{formatDateColombia(registration.created_at)}</td>
                   </tr>
                 ))}

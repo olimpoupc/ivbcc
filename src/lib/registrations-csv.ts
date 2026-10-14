@@ -1,13 +1,16 @@
 import { buildCsvContent } from "@/lib/csv";
+import { getRegistrationStatusLabel } from "@/lib/registration-status";
 
 export type RegistrationCsvRow = {
   full_name: string;
   email: string;
   phone?: string | null;
   created_at?: string | null;
+  status?: string | null;
+  checked_in_at?: string | null;
 };
 
-export const REGISTRATIONS_CSV_HEADERS = ["Nombre", "Correo", "Telefono", "Fecha"];
+export const REGISTRATIONS_CSV_HEADERS = ["Nombre", "Correo", "Telefono", "Fecha", "Estado", "Asistencia"];
 
 function formatDateTimeColombia(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -32,6 +35,10 @@ export function buildRegistrationsCsvContent(registrations: RegistrationCsvRow[]
       registration.email,
       registration.phone || "",
       formatDateTimeColombia(registration.created_at),
+      getRegistrationStatusLabel(registration.status),
+      registration.checked_in_at
+        ? `Asistió (${formatDateTimeColombia(registration.checked_in_at)})`
+        : "No registrada",
     ])
   );
 }

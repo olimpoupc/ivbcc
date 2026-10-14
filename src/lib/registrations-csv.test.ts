@@ -21,11 +21,29 @@ describe("buildRegistrationsCsvContent", () => {
     const csv = buildRegistrationsCsvContent([
       { full_name: "+cmd", email: "@correo", phone: "-1", created_at: null },
     ]);
-    expect(csv.split("\n")[2]).toBe(`"'+cmd";"'@correo";"'-1";"Sin fecha"`);
+    expect(csv.split("\n")[2]).toBe(
+      `"'+cmd";"'@correo";"'-1";"Sin fecha";"Sin estado";"No registrada"`
+    );
   });
 
   it("mantiene el formato sep=; y los encabezados", () => {
     const csv = buildRegistrationsCsvContent([]);
-    expect(csv).toBe("sep=;\nNombre;Correo;Telefono;Fecha");
+    expect(csv).toBe("sep=;\nNombre;Correo;Telefono;Fecha;Estado;Asistencia");
+  });
+
+  it("incluye el estado y la asistencia", () => {
+    const csv = buildRegistrationsCsvContent([
+      {
+        full_name: "Ana",
+        email: "ana@ejemplo.com",
+        phone: "3001234567",
+        created_at: null,
+        status: "confirmed",
+        checked_in_at: "2026-10-18T23:05:00Z",
+      },
+    ]);
+    const line = csv.split("\n")[2];
+    expect(line).toContain('"Confirmada"');
+    expect(line).toMatch(/"Asistió \(.+\)"$/);
   });
 });
