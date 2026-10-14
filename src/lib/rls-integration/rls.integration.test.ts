@@ -593,7 +593,8 @@ const specs = (): TableSpec[] => [
   { table: "help_center_items", patch: { title: "HACKED" }, insert: (t) => ({ title: `RLS ${t}`, message: "m" }) },
   // escritura publica por diseno (formularios): solo se prueba UPDATE/DELETE
   { table: "contact_messages", patch: { subject: "HACKED" }, publicInsert: true, insert: (t) => ({ full_name: "N", email: `n-${runId}@example.test`, subject: `RLS-TEST-${runId}-${t}`, message: "m" }) },
-  { table: "event_registrations", patch: { full_name: "HACKED" }, publicInsert: true, insert: (t) => ({ event_id: eventId, full_name: `RLS-TEST-${runId}-${t}`, email: `n-${runId}@example.test` }) },
+  // Sin INSERT público desde la migración 20261014130000: también se prueba el bloqueo del INSERT.
+  { table: "event_registrations", patch: { full_name: "HACKED" }, insert: (t) => ({ event_id: eventId, full_name: `RLS-TEST-${runId}-${t}`, email: `n-${t}-${runId}@example.test` }) },
 ];
 
 describe("5. Usuario NO autenticado (anon) escribiendo en tablas protegidas por RLS", () => {
@@ -1116,7 +1117,7 @@ describe("9. Tabla donations y bucket donation-receipts", () => {
 });
 
 
-describe("Inscripciones a eventos: solo eventos publicados, abiertos y futuros", () => {
+describe("Inscripciones a eventos: nadie inserta directo por la API (solo service_role)", () => {
   const ids: Record<"open" | "draft" | "closed" | "past", string> = {
     open: "",
     draft: "",
@@ -1162,16 +1163,27 @@ describe("Inscripciones a eventos: solo eventos publicados, abiertos y futuros",
     phone: "3001234567",
   });
 
-  it("CONTROL: anon SI puede inscribirse a un evento publicado, abierto y futuro", async () => {
+  // Migración 20261014130000: sin INSERT público; la Server Action inscribe
+  // con service_role y exige confirmar por correo.
+  it("BLOQUEO: anon no puede inscribirse ni siquiera a un evento publicado, abierto y futuro", async () => {
     const res = await anon.from("event_registrations").insert(registration("open", "anon"));
-    expect(res.error).toBeNull();
+    expectInsertDenied(res);
   });
 
-  it("CONTROL: un usuario autenticado SI puede inscribirse a un evento abierto", async () => {
+  it("BLOQUEO: un usuario autenticado tampoco puede inscribirse directo a un evento abierto", async () => {
     const res = await userA.client
       .from("event_registrations")
       .insert(registration("open", "user-a"));
-    expect(res.error).toBeNull();
+    expectInsertDenied(res);
+  });
+
+  it("BLOQUEO: anon no puede insertarse ya confirmado y con asistencia", async () => {
+    const res = await anon.from("event_registrations").insert({
+      ...registration("open", "anon-confirmed"),
+      status: "confirmed",
+      checked_in_at: new Date().toISOString(),
+    });
+    expectInsertDenied(res);
   });
 
   it.each(["draft", "closed", "past"] as const)(
@@ -1261,5 +1273,144 @@ describe("Noticias: el público solo lee publicadas y no vencidas (R3)", () => {
     expect(await visibleKeys(admin.client)).toEqual(
       ["draft", "expired", "published", "scheduledFuture", "scheduledPast"].sort(),
     );
+  });
+});
+
+describe("event_registrations: confirmación y asistencia", () => {
+  let pendingId: string;
+  let confirmedId: string;
+
+  beforeAll(async () => {
+    const insertRow = async (tag: string, status: "pending" | "confirmed") =>
+      mustRow(
+        await service
+          .from("event_registrations")
+          .insert({
+            event_id: eventId,
+            full_name: `RLS-TEST-${runId}-${tag}`,
+            email: `conf-${tag}-${runId}@example.test`,
+            status,
+            confirmation_token_hash: status === "pending" ? `hash-${runId}-${tag}` : null,
+          })
+          .select("id")
+          .single(),
+        `inscripción ${tag}`,
+      ).id as string;
+
+    pendingId = await insertRow("pending", "pending");
+    confirmedId = await insertRow("confirmed", "confirmed");
+    for (const id of [pendingId, confirmedId]) {
+      cleanup.push(async () => service.from("event_registrations").delete().eq("id", id));
+    }
+  });
+
+  it("BLOQUEO: anon no puede leer inscripciones (ni el hash del token)", async () => {
+    const res = await anon
+      .from("event_registrations")
+      .select("id, confirmation_token_hash")
+      .in("id", [pendingId, confirmedId]);
+    expect(res.error ?? null).toBeNull();
+    expect(res.data ?? []).toEqual([]);
+  });
+
+  it("BLOQUEO: anon no puede confirmarse a sí mismo actualizando status", async () => {
+    const res = await anon
+      .from("event_registrations")
+      .update({ status: "confirmed", confirmation_token_hash: null })
+      .eq("id", pendingId)
+      .select();
+    expectNoRowsAffectedOrDenied(res);
+    const after = must(await rowById("event_registrations", pendingId), "releer inscripción");
+    expect(after?.status).toBe("pending");
+  });
+
+  it("BLOQUEO: un usuario normal no puede leer ni marcar asistencia", async () => {
+    const read = await userA.client.from("event_registrations").select("id").eq("id", confirmedId);
+    expect(read.data ?? []).toEqual([]);
+
+    const res = await userA.client
+      .from("event_registrations")
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq("id", confirmedId)
+      .select();
+    expectNoRowsAffectedOrDenied(res);
+  });
+
+  it("CONTROL: un admin SI puede marcar asistencia a un inscrito confirmado", async () => {
+    const res = await admin.client
+      .from("event_registrations")
+      .update({ checked_in_at: new Date().toISOString(), checked_in_by: admin.id })
+      .eq("id", confirmedId)
+      .select("id, checked_in_at");
+    expect(res.error).toBeNull();
+    expect(res.data).toHaveLength(1);
+  });
+
+  it("BLOQUEO (CHECK): no se puede marcar asistencia a una inscripción pendiente", async () => {
+    const res = await admin.client
+      .from("event_registrations")
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq("id", pendingId)
+      .select("id");
+    expect(res.error?.code).toBe("23514");
+  });
+});
+
+describe("Tablas de mensajes a inscritos: email_suppressions y event_broadcasts (solo admin)", () => {
+  let broadcastId: string;
+  const suppressedEmail = `baja-${runId}@example.test`;
+
+  beforeAll(async () => {
+    must(await service.from("email_suppressions").insert({ email: suppressedEmail }), "sembrar supresión");
+    cleanup.push(async () => service.from("email_suppressions").delete().eq("email", suppressedEmail));
+
+    broadcastId = mustRow(
+      await service
+        .from("event_broadcasts")
+        .insert({ event_id: eventId, subject: `RLS ${runId}`, body: "cuerpo" })
+        .select("id")
+        .single(),
+      "sembrar mensaje",
+    ).id as string;
+    cleanup.push(async () => service.from("event_broadcasts").delete().eq("id", broadcastId));
+  });
+
+  it("BLOQUEO: anon no puede leer ni insertar supresiones (no puede dar de baja a terceros)", async () => {
+    const read = await anon.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(read.data ?? []).toEqual([]);
+
+    const insert = await anon.from("email_suppressions").insert({ email: `otro-${runId}@example.test` });
+    expectInsertDenied(insert);
+  });
+
+  it("BLOQUEO: anon no puede leer, insertar ni modificar mensajes enviados", async () => {
+    const read = await anon.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(read.data ?? []).toEqual([]);
+
+    const insert = await anon
+      .from("event_broadcasts")
+      .insert({ event_id: eventId, subject: "spam", body: "spam" });
+    expectInsertDenied(insert);
+
+    const update = await anon
+      .from("event_broadcasts")
+      .update({ sent_count: 999 })
+      .eq("id", broadcastId)
+      .select();
+    expectNoRowsAffectedOrDenied(update);
+  });
+
+  it("BLOQUEO: un usuario normal no lee supresiones ni mensajes", async () => {
+    const suppressions = await userA.client.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(suppressions.data ?? []).toEqual([]);
+    const broadcasts = await userA.client.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(broadcasts.data ?? []).toEqual([]);
+  });
+
+  it("CONTROL: un admin SI lee supresiones y mensajes", async () => {
+    const suppressions = await admin.client.from("email_suppressions").select("email").eq("email", suppressedEmail);
+    expect(suppressions.data).toHaveLength(1);
+    const broadcasts = await admin.client.from("event_broadcasts").select("id").eq("id", broadcastId);
+    expect(broadcasts.data).toHaveLength(1);
   });
 });

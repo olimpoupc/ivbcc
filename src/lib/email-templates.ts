@@ -72,7 +72,7 @@ function calendarButton(href: string, label: string) {
 
 function detailRow(label: string, value: string) {
   return `<tr>
-                    <td style="padding:8px 0;color:#6b7280;font-size:13px;width:110px;vertical-align:top;">${escapeHtml(label)}</td>
+                    <td style="padding:8px 16px 8px 0;color:#6b7280;font-size:13px;width:110px;min-width:110px;vertical-align:top;">${escapeHtml(label)}</td>
                     <td style="padding:8px 0;color:#0f2a4a;font-size:15px;font-weight:bold;">${escapeHtml(value)}</td>
                   </tr>`;
 }
@@ -138,4 +138,216 @@ export function renderEventRegistrationEmail(data: EventRegistrationEmailData) {
     </table>
   </body>
 </html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Estructura común de los correos nuevos (mismo estilo que los anteriores).
+// `title` y `bodyHtml` deben llegar ya escapados.
+// ---------------------------------------------------------------------------
+
+function primaryButton(href: string, label: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td style="background-color:#c9a24a;border-radius:999px;">
+                      <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 24px;color:#0f2a4a;font-size:14px;font-weight:bold;text-decoration:none;">
+                        ${escapeHtml(label)}
+                      </a>
+                    </td>
+                  </tr>
+                </table>`;
+}
+
+function emailLayout(title: string, bodyHtml: string, footerHtml = "") {
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background-color:#f6f0dc;font-family:Georgia,'Times New Roman',serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f0dc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#0f2a4a;padding:24px 32px;">
+                <p style="margin:0;color:#f6f0dc;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">
+                  Iglesia Valle de Bendición Cruzada Cristiana
+                </p>
+                <p style="margin:12px 0 0;color:#ffffff;font-size:24px;font-weight:bold;line-height:1.3;">
+                  ${title}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
+                ${bodyHtml}
+                <p style="margin:24px 0 0;">Bendiciones,<br />IVBCC</p>
+              </td>
+            </tr>
+            ${footerHtml}
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+export type EventConfirmationRequestEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  eventDateLabel: string;
+  eventLocation: string | null;
+  confirmUrl: string;
+};
+
+/** Correo con el enlace para confirmar la inscripción (vence en 48 h). */
+export function renderEventConfirmationRequestEmail(data: EventConfirmationRequestEmailData) {
+  const details = [
+    detailRow("Evento", data.eventTitle),
+    detailRow("Fecha", data.eventDateLabel),
+    data.eventLocation ? detailRow("Lugar", data.eventLocation) : "",
+  ].join("");
+
+  return emailLayout(
+    "Confirma tu inscripción",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">
+                  Recibimos tu solicitud de inscripción. Para completarla, confirma que este correo es tuyo:
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${details}
+                </table>
+                ${primaryButton(data.confirmUrl, "Confirmar inscripción")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  El enlace vence en 48 horas. Si no fuiste tú quien hizo esta inscripción, ignora este correo: sin confirmar, no quedarás inscrito.
+                </p>`
+  );
+}
+
+export type EventBroadcastEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  eventUrl: string;
+  /** Texto plano escrito por el administrador; se escapa y se pasa a párrafos. */
+  body: string;
+  unsubscribeUrl: string;
+};
+
+/** Mensaje de un administrador a los inscritos confirmados de un evento. */
+export function renderEventBroadcastEmail(data: EventBroadcastEmailData) {
+  const footer = `<tr>
+              <td style="padding:16px 32px 24px;border-top:1px solid #e8e2d6;color:#6b7280;font-size:12px;line-height:1.5;">
+                Recibes este mensaje porque te inscribiste a «${escapeHtml(data.eventTitle)}» y aceptaste recibir comunicaciones de la IVBCC sobre el evento.
+                <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:#0f2a4a;font-weight:bold;">Darme de baja</a>.
+              </td>
+            </tr>`;
+
+  return emailLayout(
+    escapeHtml(data.eventTitle),
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                ${nl2p(data.body)}
+                ${primaryButton(data.eventUrl, "Ver el evento")}`,
+    footer
+  );
+}
+
+export type CourseWelcomeEmailData = {
+  recipientName: string;
+  courseTitle: string;
+  courseUrl: string;
+  myCoursesUrl: string;
+};
+
+/** Bienvenida al inscribirse a un curso de formación. */
+export function renderCourseWelcomeEmail(data: CourseWelcomeEmailData) {
+  return emailLayout(
+    "¡Bienvenido al curso!",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 16px;">
+                  Te inscribiste al curso <strong>${escapeHtml(data.courseTitle)}</strong>. Avanza lección por lección a tu ritmo; al aprobar los quizzes podrás obtener tu certificado.
+                </p>
+                ${primaryButton(data.myCoursesUrl, "Ir a Mis cursos")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  También puedes abrir el curso directamente: <a href="${escapeHtml(data.courseUrl)}" style="color:#0f2a4a;">${escapeHtml(data.courseUrl)}</a>
+                </p>`
+  );
+}
+
+export type CourseCompletedEmailData = {
+  recipientName: string;
+  courseTitle: string;
+  certificateCode: string;
+  verificationUrl: string;
+};
+
+/** Aprobación del curso con el código y el enlace público del certificado. */
+export function renderCourseCompletedEmail(data: CourseCompletedEmailData) {
+  return emailLayout(
+    "¡Felicitaciones, aprobaste el curso!",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">
+                  Completaste el curso <strong>${escapeHtml(data.courseTitle)}</strong> y ya tienes tu certificado.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${detailRow("Curso", data.courseTitle)}
+                  ${detailRow("Código", data.certificateCode)}
+                </table>
+                ${primaryButton(data.verificationUrl, "Ver mi certificado")}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  Desde esa página puedes imprimirlo o guardarlo en PDF, y cualquier persona puede verificarlo con el código.
+                </p>`
+  );
+}
+
+export type EventChangeEmailData = {
+  recipientName: string;
+  eventTitle: string;
+  /** Cambios ya formateados (Fecha, Lugar, Estado): anterior -> nuevo. */
+  changes: { label: string; from: string; to: string }[];
+  cancelled: boolean;
+  eventUrl: string;
+  /** Enlaces de calendario con los datos NUEVOS; null si el evento se canceló. */
+  calendarLinks: { google: string; ics: string } | null;
+  eventsUrl: string;
+};
+
+/** Aviso de servicio: cambio de fecha, lugar o cancelación de un evento. */
+export function renderEventChangeEmail(data: EventChangeEmailData) {
+  const rows = data.changes
+    .map(
+      (change) => `<tr>
+                    <td style="padding:8px 16px 8px 0;color:#6b7280;font-size:13px;width:110px;min-width:110px;vertical-align:top;">${escapeHtml(change.label)}</td>
+                    <td style="padding:8px 0;font-size:15px;line-height:1.5;">
+                      <span style="color:#6b7280;text-decoration:line-through;">${escapeHtml(change.from)}</span><br />
+                      <strong style="color:#0f2a4a;">${escapeHtml(change.to)}</strong>
+                    </td>
+                  </tr>`
+    )
+    .join("");
+
+  const intro = data.cancelled
+    ? `Lamentamos informarte que el evento <strong>${escapeHtml(data.eventTitle)}</strong> fue cancelado.`
+    : `Hubo cambios en el evento <strong>${escapeHtml(data.eventTitle)}</strong>. Estos son los datos actualizados:`;
+
+  const actions = data.cancelled
+    ? primaryButton(data.eventsUrl, "Ver otros eventos")
+    : `${primaryButton(data.eventUrl, "Ver el evento")}${
+        data.calendarLinks
+          ? `<div style="margin:0 0 24px;padding:16px;background-color:#faf7ef;border-radius:12px;">
+                  <p style="margin:0 0 12px;color:#0f2a4a;font-size:14px;font-weight:bold;">Agendar evento (datos actualizados):</p>
+                  ${calendarButton(data.calendarLinks.google, "Google Calendar")}${calendarButton(data.calendarLinks.ics, "Apple / Outlook Calendar")}
+                </div>`
+          : ""
+      }`;
+
+  return emailLayout(
+    data.cancelled ? "Evento cancelado" : "Cambio en el evento",
+    `<p style="margin:0 0 16px;">Hola ${escapeHtml(data.recipientName)},</p>
+                <p style="margin:0 0 24px;">${intro}</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e8e2d6;border-bottom:1px solid #e8e2d6;margin:0 0 24px;">
+                  ${rows}
+                </table>
+                ${actions}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  Recibes este aviso porque estás inscrito y confirmaste tu inscripción a este evento. Es un mensaje de servicio sobre tu inscripción.
+                </p>`
+  );
 }

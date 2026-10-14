@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { buildContentMetadata, resolveSeoDescription, seoConfig } from "@/lib/seo";
 import EventCountdown from "@/components/ui/EventCountdown";
 import TrackedNextLink from "@/components/analytics/TrackedNextLink";
+import { getSessionEventRegistrationStatus } from "@/lib/session-event-registrations";
 import EventRegistrationForm from "./EventRegistrationForm";
 import ShareEventButtons from "./ShareEventButtons";
 
@@ -67,6 +68,14 @@ export default async function EventoDetallePage({ params }: Props) {
   const registrationOpen = Boolean(
     evento?.registration_enabled && new Date(evento.event_date).getTime() > now.getTime()
   );
+  // Con sesión y correo verificado: ¿ya está inscrito este correo? (solo el
+  // de la propia sesión; se consulta en el servidor).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const sessionRegistrationStatus = evento
+    ? await getSessionEventRegistrationStatus(user, evento.id)
+    : null;
   const previousEvent =
     eventoIndex >= 0 && eventos && eventoIndex > 0
       ? eventos[eventoIndex - 1]
@@ -206,7 +215,28 @@ export default async function EventoDetallePage({ params }: Props) {
           <section className="premium-surface rounded-[30px] p-8">
             <h2 className="section-title text-3xl text-gray-950">Inscripción</h2>
             <div className="mt-5">
-              {registrationOpen ? (
+              {sessionRegistrationStatus ? (
+                <div
+                  role="status"
+                  className={`rounded-2xl border px-5 py-4 text-sm ${
+                    sessionRegistrationStatus === "confirmed"
+                      ? "border-green-200 bg-green-50/80 text-green-900"
+                      : "border-amber-200 bg-amber-50/80 text-amber-900"
+                  }`}
+                >
+                  <p className="text-base font-extrabold">Ya estás inscrito en este evento</p>
+                  <p className="mt-1">
+                    Estado:{" "}
+                    <strong>
+                      {sessionRegistrationStatus === "confirmed"
+                        ? "confirmada"
+                        : "pendiente de confirmar"}
+                    </strong>
+                    {sessionRegistrationStatus === "pending" &&
+                      ". Revisa tu correo y abre el enlace para confirmar."}
+                  </p>
+                </div>
+              ) : registrationOpen ? (
                 <EventRegistrationForm eventId={evento.id} />
               ) : (
                 <div className="rounded-2xl bg-[#f6f1e8] px-5 py-4 text-sm font-medium text-gray-600">

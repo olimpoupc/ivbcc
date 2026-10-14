@@ -297,7 +297,8 @@ export default async function AdminDashboardPage() {
       .eq("status", "published"),
     supabase
       .from("event_registrations")
-      .select("id", { count: "exact", head: true }),
+      .select("id", { count: "exact", head: true })
+      .eq("status", "confirmed"),
     supabase
       .from("course_enrollments")
       .select("id", { count: "exact", head: true }),
